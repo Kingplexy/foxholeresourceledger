@@ -6,7 +6,7 @@
 <title>Colonial War Office — Command Network</title>
 
 <!-- ======================================================================
-     SETUP: paste your Supabase project URL + anon key below.
+     SETUP: paste your sb project URL + anon key below.
      See SETUP.md for how to get these (2 minutes, free).
 ====================================================================== -->
 <script>
@@ -203,7 +203,7 @@
   </div>
 </div>
 <div id="configWarning" class="hidden" style="position:fixed;top:0;left:0;right:0;background:var(--red-stamp);color:#fff;padding:10px 16px;font-size:11.5px;text-align:center;z-index:200;">
-  ⚠ Supabase isn't connected yet — open index.html and replace SUPABASE_URL / SUPABASE_ANON_KEY near the top of the file with your real project values (see SETUP.md).
+  ⚠ sb isn't connected yet — open index.html and replace SUPABASE_URL / SUPABASE_ANON_KEY near the top of the file with your real project values (see SETUP.md).
 </div>
 
 <!-- ============================= ONBOARDING ============================= -->
@@ -381,18 +381,18 @@
 
 <script>
 /* ==========================================================================
-   SUPABASE CLIENT
+   sb CLIENT
 ========================================================================== */
 if(!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY || window.SUPABASE_URL.includes('YOUR_SUPABASE') || window.SUPABASE_ANON_KEY.includes('YOUR_SUPABASE')){
   document.addEventListener('DOMContentLoaded', ()=> document.getElementById('configWarning').classList.remove('hidden'));
 }
-let supabase;
+let sb;
 try{
-  supabase = window.supabase.createClient(window.SUPABASE_URL || 'https://placeholder.supabase.co', window.SUPABASE_ANON_KEY || 'placeholder');
+  sb = window.supabase.createClient(window.SUPABASE_URL || 'https://placeholder.supabase.co', window.SUPABASE_ANON_KEY || 'placeholder');
 }catch(e){
   document.addEventListener('DOMContentLoaded', ()=>{
     document.getElementById('configWarning').classList.remove('hidden');
-    document.getElementById('configWarning').textContent = '⚠ Could not connect to Supabase: '+e.message+' — check SUPABASE_URL / SUPABASE_ANON_KEY near the top of index.html.';
+    document.getElementById('configWarning').textContent = '⚠ Could not connect to sb: '+e.message+' — check SUPABASE_URL / SUPABASE_ANON_KEY near the top of index.html.';
   });
 }
 
@@ -480,17 +480,17 @@ $('#authSubmitBtn').addEventListener('click', async ()=>{
   errEl.classList.add('hidden');
   noticeEl.classList.add('hidden');
   if(!email || !password){ errEl.textContent='Enter an email and password.'; errEl.classList.remove('hidden'); return; }
-  if(password.length < 6){ errEl.textContent='Password must be at least 6 characters (Supabase minimum).'; errEl.classList.remove('hidden'); return; }
+  if(password.length < 6){ errEl.textContent='Password must be at least 6 characters (sb minimum).'; errEl.classList.remove('hidden'); return; }
 
   const originalLabel = btn.textContent;
   btn.disabled = true; btn.textContent = 'WORKING...';
   try{
     if(authMode==='signup'){
       const username = $('#authUsername').value.trim() || email.split('@')[0];
-      const { data, error } = await supabase.auth.signUp({ email, password, options:{ data:{ username } } });
+      const { data, error } = await sb.auth.signUp({ email, password, options:{ data:{ username } } });
       if(error) throw error;
       if(data.user && !data.session){
-        noticeEl.textContent = 'Account created. Check your inbox at '+email+' and click the confirmation link before signing in. (If you don\'t see it, check spam — or turn off "Confirm email" in Supabase Authentication settings while testing.)';
+        noticeEl.textContent = 'Account created. Check your inbox at '+email+' and click the confirmation link before signing in. (If you don\'t see it, check spam — or turn off "Confirm email" in sb Authentication settings while testing.)';
         noticeEl.classList.remove('hidden');
       } else if(data.session){
         showToast('Account created — signing you in...');
@@ -499,7 +499,7 @@ $('#authSubmitBtn').addEventListener('click', async ()=>{
         errEl.classList.remove('hidden');
       }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await sb.auth.signInWithPassword({ email, password });
       if(error) throw error;
     }
   }catch(e){
@@ -512,11 +512,11 @@ $('#authSubmitBtn').addEventListener('click', async ()=>{
 });
 
 $('#signOutBtn').addEventListener('click', async ()=>{
-  await supabase.auth.signOut();
+  await sb.auth.signOut();
   location.reload();
 });
 
-supabase.auth.onAuthStateChange((event, session)=>{
+sb.auth.onAuthStateChange((event, session)=>{
   if(session && session.user){
     currentUser = session.user;
     initSession().catch(e=>{
@@ -527,7 +527,7 @@ supabase.auth.onAuthStateChange((event, session)=>{
 });
 
 async function initSession(){
-  const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+  const { data: profile, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
   if(error && error.code !== 'PGRST116') throw error;
   currentProfile = profile;
   $('#footerUsername').textContent = profile?.username || currentUser.email;
@@ -541,7 +541,7 @@ async function initSession(){
 async function loadContexts(){
   contexts = [];
 
-  const { data: memberships } = await supabase
+  const { data: memberships } = await sb
     .from('regiment_members')
     .select('regiment_id, role_id, regiments(name), regiment_roles(name, permissions, is_commander_role)')
     .eq('user_id', currentUser.id);
@@ -551,7 +551,7 @@ async function loadContexts(){
     contexts.push({ type:'regiment', id:m.regiment_id, name:m.regiments?.name || 'Regiment', roleName:m.regiment_roles?.name, permissions:perms });
   });
 
-  const { data: personalLedger } = await supabase.from('ledgers').select('id').eq('owner_id', currentUser.id).maybeSingle();
+  const { data: personalLedger } = await sb.from('ledgers').select('id').eq('owner_id', currentUser.id).maybeSingle();
   if(personalLedger){
     contexts.push({ type:'personal', id:'personal', ledgerId:personalLedger.id, name:'Personal Ledger', permissions:new Set(['edit_ledger','manage_ledger']) });
   }
@@ -592,7 +592,7 @@ async function switchContext(ctx){
   if(ctx.type==='personal'){
     currentLedgerId = ctx.ledgerId;
   } else {
-    const { data: ledger } = await supabase.from('ledgers').select('id').eq('regiment_id', ctx.id).maybeSingle();
+    const { data: ledger } = await sb.from('ledgers').select('id').eq('regiment_id', ctx.id).maybeSingle();
     currentLedgerId = ledger?.id || null;
   }
   if(currentLedgerId){ await loadLedger(); setupLedgerRealtime(); }
@@ -622,7 +622,7 @@ function showTab(tab){
 function capitalize(s){ return s[0].toUpperCase()+s.slice(1); }
 
 function teardownRealtime(){
-  realtimeChannels.forEach(ch=> supabase.removeChannel(ch));
+  realtimeChannels.forEach(ch=> sb.removeChannel(ch));
   realtimeChannels = [];
 }
 
@@ -645,7 +645,7 @@ document.getElementById('joinCodeBtn').addEventListener('click', async ()=>{
   const code = $('#joinCodeInput').value.trim();
   if(!code) return;
   try{
-    const { error } = await supabase.rpc('redeem_invite_code', { p_code: code });
+    const { error } = await sb.rpc('redeem_invite_code', { p_code: code });
     if(error) throw error;
     showToast('Joined regiment');
     await loadContexts();
@@ -658,7 +658,7 @@ document.getElementById('createRegBtn').addEventListener('click', async ()=>{
   const name = $('#createRegNameInput').value.trim();
   if(!name) return;
   try{
-    const { data: regId, error } = await supabase.rpc('create_regiment', { p_name: name });
+    const { data: regId, error } = await sb.rpc('create_regiment', { p_name: name });
     if(error) throw error;
     await seedLedgerCatalog(await createLedgerFor({ regiment_id: regId }));
     showToast('Regiment created');
@@ -680,7 +680,7 @@ async function createStandaloneLedger(){
 }
 
 async function createLedgerFor(fields){
-  const { data, error } = await supabase.from('ledgers').insert(fields).select().single();
+  const { data, error } = await sb.from('ledgers').insert(fields).select().single();
   if(error) throw error;
   return data.id;
 }
@@ -690,7 +690,7 @@ async function seedLedgerCatalog(ledgerId){
   Object.keys(DEFAULT_ITEMS).forEach(cat=>{
     DEFAULT_ITEMS[cat].forEach(([name,sub])=> rows.push({ ledger_id: ledgerId, category:cat, name, sub, qty:0 }));
   });
-  const { error } = await supabase.from('ledger_items').insert(rows);
+  const { error } = await sb.from('ledger_items').insert(rows);
   if(error) throw error;
 }
 
@@ -704,8 +704,8 @@ document.getElementById('ledgerSearch').addEventListener('input', renderLedgerGr
 
 async function loadLedger(){
   const [{ data: items }, { data: whs }] = await Promise.all([
-    supabase.from('ledger_items').select('*').eq('ledger_id', currentLedgerId).order('category').order('name'),
-    supabase.from('ledger_warehouses').select('*').eq('ledger_id', currentLedgerId),
+    sb.from('ledger_items').select('*').eq('ledger_id', currentLedgerId).order('category').order('name'),
+    sb.from('ledger_warehouses').select('*').eq('ledger_id', currentLedgerId),
   ]);
   ledgerItems = items || [];
   ledgerWarehouses = whs || [];
@@ -713,7 +713,7 @@ async function loadLedger(){
 }
 
 function setupLedgerRealtime(){
-  const ch = supabase.channel('ledger-'+currentLedgerId)
+  const ch = sb.channel('ledger-'+currentLedgerId)
     .on('postgres_changes', { event:'*', schema:'public', table:'ledger_items', filter:`ledger_id=eq.${currentLedgerId}` }, loadLedger)
     .subscribe();
   realtimeChannels.push(ch);
@@ -761,14 +761,14 @@ async function changeLedgerQty(id, delta){
   const it = ledgerItems.find(x=>x.id===id);
   if(!it) return;
   const newQty = Math.max(0, it.qty + delta);
-  const { error } = await supabase.from('ledger_items').update({ qty:newQty }).eq('id', id);
+  const { error } = await sb.from('ledger_items').update({ qty:newQty }).eq('id', id);
   if(error){ showToast(error.message, true); return; }
-  await supabase.from('ledger_log').insert({ ledger_id: currentLedgerId, item_name: it.name, qty_delta: delta, actor_id: currentUser.id });
+  await sb.from('ledger_log').insert({ ledger_id: currentLedgerId, item_name: it.name, qty_delta: delta, actor_id: currentUser.id });
   it.qty = newQty;
   renderLedgerGrid();
 }
 async function removeLedgerItem(id){
-  const { error } = await supabase.from('ledger_items').delete().eq('id', id);
+  const { error } = await sb.from('ledger_items').delete().eq('id', id);
   if(error){ showToast(error.message, true); return; }
   ledgerItems = ledgerItems.filter(x=>x.id!==id);
   renderLedgerGrid();
@@ -784,7 +784,7 @@ document.getElementById('confirmAddItemBtn').addEventListener('click', async ()=
   if(!name) return showToast('Enter a name', true);
   const category = $('#newItemCat').value;
   const sub = $('#newItemSub').value.trim();
-  const { data, error } = await supabase.from('ledger_items').insert({ ledger_id: currentLedgerId, category, name, sub, qty:0 }).select().single();
+  const { data, error } = await sb.from('ledger_items').insert({ ledger_id: currentLedgerId, category, name, sub, qty:0 }).select().single();
   if(error) return showToast(error.message, true);
   ledgerItems.push(data);
   document.getElementById('addItemModal').classList.remove('show');
@@ -796,12 +796,12 @@ document.getElementById('confirmAddItemBtn').addEventListener('click', async ()=
    ROSTER TAB
 ========================================================================== */
 async function loadRoster(){
-  const { data: members } = await supabase
+  const { data: members } = await sb
     .from('regiment_members')
     .select('id, user_id, joined_at, role_id, profiles(username), regiment_roles(name)')
     .eq('regiment_id', activeContext.id);
 
-  const { data: roles } = await supabase.from('regiment_roles').select('*').eq('regiment_id', activeContext.id).order('rank_order');
+  const { data: roles } = await sb.from('regiment_roles').select('*').eq('regiment_id', activeContext.id).order('rank_order');
 
   document.getElementById('rosterCount').textContent = (members||[]).length + ' members';
   const canManage = activeContext.permissions.has('manage_roster');
@@ -820,13 +820,13 @@ async function loadRoster(){
   `).join('');
 
   $all('.roleSelect', tbody).forEach(sel=> sel.addEventListener('change', async ()=>{
-    const { error } = await supabase.from('regiment_members').update({ role_id: sel.value }).eq('id', sel.dataset.member);
+    const { error } = await sb.from('regiment_members').update({ role_id: sel.value }).eq('id', sel.dataset.member);
     if(error) return showToast(error.message, true);
     showToast('Role updated');
   }));
   $all('[data-remove-member]', tbody).forEach(btn=> btn.addEventListener('click', async ()=>{
     if(!confirm('Remove this member from the regiment?')) return;
-    const { error } = await supabase.from('regiment_members').delete().eq('id', btn.dataset.removeMember);
+    const { error } = await sb.from('regiment_members').delete().eq('id', btn.dataset.removeMember);
     if(error) return showToast(error.message, true);
     loadRoster();
   }));
@@ -836,7 +836,7 @@ async function loadRoster(){
 }
 
 async function loadInviteCodes(){
-  const { data: codes } = await supabase.from('invite_codes').select('*').eq('regiment_id', activeContext.id).order('created_at', {ascending:false});
+  const { data: codes } = await sb.from('invite_codes').select('*').eq('regiment_id', activeContext.id).order('created_at', {ascending:false});
   const list = document.getElementById('inviteCodesList');
   list.innerHTML = (codes||[]).map(c=> `
     <div class="invite-row">
@@ -847,14 +847,14 @@ async function loadInviteCodes(){
     </div>
   `).join('') || '<div class="empty-state">No invite codes yet.</div>';
   $all('[data-revoke]', list).forEach(btn=> btn.addEventListener('click', async ()=>{
-    await supabase.from('invite_codes').update({ revoked:true }).eq('id', btn.dataset.revoke);
+    await sb.from('invite_codes').update({ revoked:true }).eq('id', btn.dataset.revoke);
     loadInviteCodes();
   }));
 }
 
 document.getElementById('newInviteBtn').addEventListener('click', async ()=>{
   const code = Math.random().toString(36).slice(2,6).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();
-  const { error } = await supabase.from('invite_codes').insert({ regiment_id: activeContext.id, code, created_by: currentUser.id });
+  const { error } = await sb.from('invite_codes').insert({ regiment_id: activeContext.id, code, created_by: currentUser.id });
   if(error) return showToast(error.message, true);
   showToast('Invite code created: '+code);
   loadInviteCodes();
@@ -865,7 +865,7 @@ document.getElementById('newInviteBtn').addEventListener('click', async ()=>{
 ========================================================================== */
 let editingRoleId = null;
 async function loadRoles(){
-  const { data: roles } = await supabase.from('regiment_roles').select('*').eq('regiment_id', activeContext.id).order('rank_order');
+  const { data: roles } = await sb.from('regiment_roles').select('*').eq('regiment_id', activeContext.id).order('rank_order');
   const list = document.getElementById('rolesList');
   list.innerHTML = (roles||[]).map(r=> `
     <div class="role-card">
@@ -893,10 +893,10 @@ document.getElementById('confirmRoleBtn').addEventListener('click', async ()=>{
   if(!name) return showToast('Enter a role name', true);
   const perms = $all('#roleModalPerms input:checked').map(i=>i.value);
   if(editingRoleId){
-    const { error } = await supabase.from('regiment_roles').update({ name, permissions: perms }).eq('id', editingRoleId);
+    const { error } = await sb.from('regiment_roles').update({ name, permissions: perms }).eq('id', editingRoleId);
     if(error) return showToast(error.message, true);
   } else {
-    const { error } = await supabase.from('regiment_roles').insert({ regiment_id: activeContext.id, name, permissions: perms, rank_order: 99 });
+    const { error } = await sb.from('regiment_roles').insert({ regiment_id: activeContext.id, name, permissions: perms, rank_order: 99 });
     if(error) return showToast(error.message, true);
   }
   document.getElementById('roleModal').classList.remove('show');
@@ -919,7 +919,7 @@ let lineDraft = null;
 let zoneDraft = null;
 
 async function loadMapTab(){
-  const { data: ops } = await supabase.from('operations').select('*').eq('regiment_id', activeContext.id).order('created_at', {ascending:false});
+  const { data: ops } = await sb.from('operations').select('*').eq('regiment_id', activeContext.id).order('created_at', {ascending:false});
   const sel = document.getElementById('opSelect');
   sel.innerHTML = (ops||[]).map(o=> `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('') || '<option value="">No operations yet</option>';
   document.getElementById('newOpBtn').classList.toggle('hidden', !activeContext.permissions.has('manage_ops'));
@@ -951,16 +951,16 @@ async function loadOp(op){
     mapImage.onload = ()=>{ mapImageLoaded = true; drawMap(); };
     mapImage.src = op.map_image_url;
   }
-  const { data: elements } = await supabase.from('op_elements').select('*').eq('op_id', op.id);
+  const { data: elements } = await sb.from('op_elements').select('*').eq('op_id', op.id);
   opElements = elements || [];
   drawMap();
   setupMapRealtime(op.id);
 }
 
 function setupMapRealtime(opId){
-  const ch = supabase.channel('op-'+opId)
+  const ch = sb.channel('op-'+opId)
     .on('postgres_changes', { event:'*', schema:'public', table:'op_elements', filter:`op_id=eq.${opId}` }, async ()=>{
-      const { data } = await supabase.from('op_elements').select('*').eq('op_id', opId);
+      const { data } = await sb.from('op_elements').select('*').eq('op_id', opId);
       opElements = data || [];
       drawMap();
     })
@@ -975,7 +975,7 @@ document.getElementById('newOpBtn').addEventListener('click', ()=>{
 document.getElementById('confirmNewOpBtn').addEventListener('click', async ()=>{
   const name = $('#newOpName').value.trim();
   if(!name) return showToast('Enter an operation name', true);
-  const { data, error } = await supabase.from('operations').insert({ regiment_id: activeContext.id, name, description: $('#newOpDesc').value.trim(), created_by: currentUser.id }).select().single();
+  const { data, error } = await sb.from('operations').insert({ regiment_id: activeContext.id, name, description: $('#newOpDesc').value.trim(), created_by: currentUser.id }).select().single();
   if(error) return showToast(error.message, true);
   document.getElementById('newOpModal').classList.remove('show');
   showToast('Operation created');
@@ -987,10 +987,10 @@ document.getElementById('mapImageInput').addEventListener('change', async e=>{
   const file = e.target.files[0];
   if(!file || !currentOpId) return;
   const path = `${currentOpId}-${Date.now()}-${file.name}`;
-  const { error: upErr } = await supabase.storage.from('map-images').upload(path, file);
+  const { error: upErr } = await sb.storage.from('map-images').upload(path, file);
   if(upErr) return showToast(upErr.message, true);
-  const { data: pub } = supabase.storage.from('map-images').getPublicUrl(path);
-  const { error } = await supabase.from('operations').update({ map_image_url: pub.publicUrl }).eq('id', currentOpId);
+  const { data: pub } = sb.storage.from('map-images').getPublicUrl(path);
+  const { error } = await sb.from('operations').update({ map_image_url: pub.publicUrl }).eq('id', currentOpId);
   if(error) return showToast(error.message, true);
   showToast('Map image uploaded');
   loadMapTab();
@@ -1133,12 +1133,12 @@ canvas.addEventListener('click', e=>{
 });
 
 async function addElement(type, data){
-  const { error } = await supabase.from('op_elements').insert({ op_id: currentOpId, element_type:type, data, created_by: currentUser.id });
+  const { error } = await sb.from('op_elements').insert({ op_id: currentOpId, element_type:type, data, created_by: currentUser.id });
   if(error) showToast(error.message, true);
 }
 document.getElementById('clearSelToolBtn').addEventListener('click', async ()=>{
   if(!selectedElementId) return showToast('Click a marker (with Pan tool) to select it first', true);
-  await supabase.from('op_elements').delete().eq('id', selectedElementId);
+  await sb.from('op_elements').delete().eq('id', selectedElementId);
   selectedElementId = null;
 });
 
@@ -1154,7 +1154,7 @@ $all('#reportFilterTabs .tab').forEach(t=> t.addEventListener('click', ()=>{
 
 async function loadReports(){
   document.getElementById('newReportBtn').classList.toggle('hidden', !activeContext.permissions.has('submit_reports'));
-  let query = supabase.from('field_reports').select('*, profiles(username)').eq('regiment_id', activeContext.id).order('created_at', {ascending:false});
+  let query = sb.from('field_reports').select('*, profiles(username)').eq('regiment_id', activeContext.id).order('created_at', {ascending:false});
   if(reportFilter!=='all') query = query.eq('status', reportFilter);
   const { data: reports, error } = await query;
   const list = document.getElementById('reportsList');
@@ -1178,12 +1178,12 @@ async function loadReports(){
 
   $all('[data-mark]', list).forEach(btn=> btn.addEventListener('click', async ()=>{
     const [id,status] = btn.dataset.mark.split(':');
-    await supabase.from('field_reports').update({ status }).eq('id', id);
+    await sb.from('field_reports').update({ status }).eq('id', id);
     loadReports();
   }));
   $all('[data-del-report]', list).forEach(btn=> btn.addEventListener('click', async ()=>{
     if(!confirm('Delete this report?')) return;
-    await supabase.from('field_reports').delete().eq('id', btn.dataset.delReport);
+    await sb.from('field_reports').delete().eq('id', btn.dataset.delReport);
     loadReports();
   }));
 }
@@ -1195,7 +1195,7 @@ document.getElementById('newReportBtn').addEventListener('click', ()=>{
 document.getElementById('confirmReportBtn').addEventListener('click', async ()=>{
   const title = $('#reportTitle').value.trim();
   if(!title) return showToast('Enter a title', true);
-  const { error } = await supabase.from('field_reports').insert({
+  const { error } = await sb.from('field_reports').insert({
     regiment_id: activeContext.id, submitted_by: currentUser.id, title,
     report_type: $('#reportType').value, description: $('#reportDesc').value.trim(),
   });
@@ -1219,7 +1219,7 @@ document.getElementById('addContextBtn').addEventListener('click', ()=>{
 
 /* Kick off: check for existing session */
 (async ()=>{
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await sb.auth.getSession();
   if(session){ currentUser = session.user; await initSession(); }
   resizeCanvas();
 })();
