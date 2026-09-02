@@ -249,18 +249,14 @@
 
   /* ---------- Site footer / credit ---------- */
   #siteFooter{
-    position:fixed;left:0;right:0;bottom:0;z-index:70;
     display:flex;flex-direction:column;align-items:center;gap:2px;
-    background:rgba(18,18,10,.72);backdrop-filter:blur(2px);
-    padding:6px 14px 7px;border-top:1px solid rgba(201,162,75,.3);
+    padding:14px 14px 16px;
   }
   .credit-badge{display:flex;align-items:center;gap:8px;}
   .credit-logo{width:24px;height:24px;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));}
   .credit-text{color:var(--parchment);font-size:10.5px;letter-spacing:.04em;}
   .credit-text strong{color:var(--gold-bright);}
   .footer-note{color:#c9c2a0;font-size:8.5px;text-align:center;letter-spacing:.02em;opacity:.8;max-width:640px;line-height:1.4;}
-  body{padding-bottom:52px;}
-  #appShell.active{min-height:calc(100vh - 52px);}
 </style>
 </head>
 <body>
