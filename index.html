@@ -10,8 +10,8 @@
      See SETUP.md for how to get these (2 minutes, free).
 ====================================================================== -->
 <script>
-  window.SUPABASE_URL = "sb_publishable_ECLZI1XG3xiSJlpdvc_hHA_hNf9MBD8";
-  window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwdGx2aWp4dGJxaW12YXV2b2tyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzODQyMTksImV4cCI6MjEwMzk2MDIxOX0.kHXGOV0v33vZiTH0GjCSai8toZLN9nPdbJo5I5R1Jn8";
+  window.SUPABASE_URL = "https://kptlvijxtbqimvauvokr.supabase.co";
+  window.SUPABASE_ANON_KEY = "sb_publishable_ECLZI1XG3xiSJlpdvc_hHA_hNf9MBD8";
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -199,7 +199,11 @@
     <input type="password" id="authPassword" placeholder="••••••••">
     <button class="btn auth-submit" id="authSubmitBtn">SIGN IN</button>
     <div class="auth-error hidden" id="authError"></div>
+    <div class="auth-error hidden" id="authNotice" style="color:var(--green-btn-dark);"></div>
   </div>
+</div>
+<div id="configWarning" class="hidden" style="position:fixed;top:0;left:0;right:0;background:var(--red-stamp);color:#fff;padding:10px 16px;font-size:11.5px;text-align:center;z-index:200;">
+  ⚠ Supabase isn't connected yet — open index.html and replace SUPABASE_URL / SUPABASE_ANON_KEY near the top of the file with your real project values (see SETUP.md).
 </div>
 
 <!-- ============================= ONBOARDING ============================= -->
@@ -379,7 +383,18 @@
 /* ==========================================================================
    SUPABASE CLIENT
 ========================================================================== */
-const supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+if(!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY || window.SUPABASE_URL.includes('YOUR_SUPABASE') || window.SUPABASE_ANON_KEY.includes('YOUR_SUPABASE')){
+  document.addEventListener('DOMContentLoaded', ()=> document.getElementById('configWarning').classList.remove('hidden'));
+}
+let supabase;
+try{
+  supabase = window.supabase.createClient(window.SUPABASE_URL || 'https://placeholder.supabase.co', window.SUPABASE_ANON_KEY || 'placeholder');
+}catch(e){
+  document.addEventListener('DOMContentLoaded', ()=>{
+    document.getElementById('configWarning').classList.remove('hidden');
+    document.getElementById('configWarning').textContent = '⚠ Could not connect to Supabase: '+e.message+' — check SUPABASE_URL / SUPABASE_ANON_KEY near the top of index.html.';
+  });
+}
 
 let toastTimer;
 function showToast(msg, isError){
@@ -460,21 +475,39 @@ $('#authSubmitBtn').addEventListener('click', async ()=>{
   const email = $('#authEmail').value.trim();
   const password = $('#authPassword').value;
   const errEl = $('#authError');
+  const noticeEl = $('#authNotice');
+  const btn = $('#authSubmitBtn');
   errEl.classList.add('hidden');
+  noticeEl.classList.add('hidden');
   if(!email || !password){ errEl.textContent='Enter an email and password.'; errEl.classList.remove('hidden'); return; }
+  if(password.length < 6){ errEl.textContent='Password must be at least 6 characters (Supabase minimum).'; errEl.classList.remove('hidden'); return; }
+
+  const originalLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = 'WORKING...';
   try{
     if(authMode==='signup'){
       const username = $('#authUsername').value.trim() || email.split('@')[0];
-      const { error } = await supabase.auth.signUp({ email, password, options:{ data:{ username } } });
+      const { data, error } = await supabase.auth.signUp({ email, password, options:{ data:{ username } } });
       if(error) throw error;
-      showToast('Account created — check your email if confirmation is required.');
+      if(data.user && !data.session){
+        noticeEl.textContent = 'Account created. Check your inbox at '+email+' and click the confirmation link before signing in. (If you don\'t see it, check spam — or turn off "Confirm email" in Supabase Authentication settings while testing.)';
+        noticeEl.classList.remove('hidden');
+      } else if(data.session){
+        showToast('Account created — signing you in...');
+      } else {
+        errEl.textContent = 'Sign-up did not return a user or session. Open the browser console (F12) for details.';
+        errEl.classList.remove('hidden');
+      }
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if(error) throw error;
     }
   }catch(e){
-    errEl.textContent = e.message || 'Something went wrong.';
+    console.error('Auth error:', e);
+    errEl.textContent = e.message || 'Something went wrong. Open the browser console (F12) for details.';
     errEl.classList.remove('hidden');
+  }finally{
+    btn.disabled = false; btn.textContent = originalLabel;
   }
 });
 
@@ -486,12 +519,16 @@ $('#signOutBtn').addEventListener('click', async ()=>{
 supabase.auth.onAuthStateChange((event, session)=>{
   if(session && session.user){
     currentUser = session.user;
-    initSession();
+    initSession().catch(e=>{
+      console.error('initSession failed:', e);
+      showToast('Could not load your account: '+e.message, true);
+    });
   }
 });
 
 async function initSession(){
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+  const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+  if(error && error.code !== 'PGRST116') throw error;
   currentProfile = profile;
   $('#footerUsername').textContent = profile?.username || currentUser.email;
   $('#onboardUsername').textContent = profile?.username || currentUser.email;
