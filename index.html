@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colonial War Office — Command Network</title>
+
+<!-- ======================================================================
+     SETUP: paste your Supabase project URL + anon key below.
+     See SETUP.md for how to get these (2 minutes, free).
+====================================================================== -->
+<script>
+  window.SUPABASE_URL = "sb_publishable_ECLZI1XG3xiSJlpdvc_hHA_hNf9MBD8";
+  window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwdGx2aWp4dGJxaW12YXV2b2tyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzODQyMTksImV4cCI6MjEwMzk2MDIxOX0.kHXGOV0v33vZiTH0GjCSai8toZLN9nPdbJo5I5R1Jn8";
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  :root{
+    --olive-deep:#33351f; --olive-mid:#4a4d2c; --olive-line:#5c5f38;
+    --gold:#c9a24b; --gold-bright:#e0bd63;
+    --parchment:#e9e0c4; --parchment-dark:#ddd2ac; --parchment-card:#f1e9d0;
+    --ink:#2c2a1e; --ink-soft:#5c563f;
+    --red-stamp:#8c3b2e; --green-btn:#565a34; --green-btn-dark:#454826;
+    --blue-status:#2e5f8c;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:radial-gradient(ellipse at 20% 0%, #464825 0%, transparent 60%), linear-gradient(160deg,var(--olive-deep),#26271a 70%);
+    min-height:100vh; font-family:"Courier New",ui-monospace,monospace; color:var(--ink);
+  }
+  ::selection{background:var(--gold);color:var(--olive-deep);}
+  button,input,select,textarea{font-family:inherit;}
+
+  .btn{
+    font-size:10.5px;letter-spacing:.06em;font-weight:700;border:1px solid #3f4225;
+    background:var(--green-btn);color:var(--parchment);padding:9px 13px;cursor:pointer;
+    display:inline-flex;align-items:center;gap:6px;transition:background .15s ease, transform .1s ease;
+  }
+  .btn:hover{background:var(--green-btn-dark);}
+  .btn:active{transform:translateY(1px);}
+  .btn.ghost{background:transparent;color:var(--ink);border-color:#b8ac83;}
+  .btn.ghost:hover{background:#ded2ac;}
+  .btn.danger{background:transparent;color:var(--red-stamp);border-color:#c9a294;}
+  .btn.danger:hover{background:#f0dedb;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn.small{padding:6px 9px;font-size:9.5px;}
+
+  input[type=text],input[type=email],input[type=password],input[type=number],select,textarea{
+    width:100%;padding:9px 10px;border:1px solid #b8ac83;background:var(--parchment-card);
+    font-size:12.5px;color:var(--ink);outline:none;
+  }
+  label{display:block;font-size:9.5px;letter-spacing:.08em;color:var(--ink-soft);margin:12px 0 5px;font-weight:700;text-transform:uppercase;}
+
+  .hidden{display:none !important;}
+
+  /* ---------- Auth screen ---------- */
+  #authScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .auth-card{
+    background:var(--parchment);border:1px solid #b8ac83;box-shadow:0 20px 50px rgba(0,0,0,.45);
+    width:100%;max-width:380px;padding:30px 28px;
+  }
+  .auth-seal{width:44px;height:44px;border-radius:50%;border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-weight:700;color:var(--gold);font-size:16px;margin:0 auto 14px;}
+  .auth-title{font-family:Georgia,serif;font-size:20px;text-align:center;margin-bottom:2px;}
+  .auth-sub{text-align:center;font-size:10.5px;color:var(--ink-soft);letter-spacing:.06em;margin-bottom:18px;}
+  .auth-toggle{display:flex;gap:0;border:1px solid #b8ac83;margin-bottom:16px;}
+  .auth-toggle button{flex:1;background:var(--parchment-card);border:none;padding:9px;font-size:10.5px;font-weight:700;letter-spacing:.06em;cursor:pointer;color:var(--ink-soft);}
+  .auth-toggle button.active{background:var(--green-btn);color:var(--parchment);}
+  .auth-error{color:var(--red-stamp);font-size:11px;margin-top:10px;}
+  .auth-submit{width:100%;justify-content:center;margin-top:16px;}
+
+  /* ---------- Onboarding ---------- */
+  #onboardScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .onboard-card{background:var(--parchment);border:1px solid #b8ac83;box-shadow:0 20px 50px rgba(0,0,0,.45);width:100%;max-width:460px;padding:28px;}
+  .onboard-options{display:flex;flex-direction:column;gap:10px;margin-top:16px;}
+  .onboard-opt{border:1px solid #b8ac83;background:var(--parchment-card);padding:14px;cursor:pointer;}
+  .onboard-opt:hover{background:#e6dab0;}
+  .onboard-opt h4{margin:0 0 4px;font-family:Georgia,serif;font-size:14px;}
+  .onboard-opt p{margin:0;font-size:11px;color:var(--ink-soft);}
+  .onboard-form{margin-top:14px;}
+  .onboard-back{background:none;border:none;color:var(--ink-soft);font-size:10.5px;font-weight:700;cursor:pointer;padding:0;margin-bottom:10px;}
+
+  /* ---------- App shell ---------- */
+  #appShell{display:none;min-height:100vh;}
+  #appShell.active{display:flex;}
+  .sidebar{
+    width:230px;flex-shrink:0;background:#2a2b19;color:var(--parchment);
+    padding:16px 12px;display:flex;flex-direction:column;gap:16px;
+  }
+  .sidebar-brand{display:flex;align-items:center;gap:10px;padding:0 4px 12px;border-bottom:1px solid #43451f;}
+  .sidebar-brand .seal{width:30px;height:30px;border-radius:50%;border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-weight:700;color:var(--gold);font-size:12px;}
+  .sidebar-brand .name{font-family:Georgia,serif;font-size:13px;font-weight:700;}
+  .sidebar-section-label{font-size:9px;letter-spacing:.1em;opacity:.6;padding:0 4px;margin-top:4px;}
+  .context-item{
+    padding:9px 10px;font-size:11.5px;cursor:pointer;border-left:3px solid transparent;opacity:.8;
+  }
+  .context-item:hover{background:#3a3c22;opacity:1;}
+  .context-item.active{background:#3a3c22;border-left-color:var(--gold);opacity:1;color:var(--gold-bright);font-weight:700;}
+  .sidebar-add{padding:9px 10px;font-size:11px;color:var(--gold-bright);cursor:pointer;opacity:.85;}
+  .sidebar-add:hover{opacity:1;}
+  .sidebar-footer{margin-top:auto;padding-top:10px;border-top:1px solid #43451f;font-size:10px;opacity:.7;}
+  .sidebar-footer button{background:none;border:none;color:var(--parchment);font-size:10px;cursor:pointer;text-decoration:underline;padding:0;}
+
+  .main-area{flex:1;padding:22px 26px 50px;overflow-x:hidden;}
+  .sheet-header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:16px;}
+  .sheet-header h1{font-family:Georgia,serif;font-size:24px;margin:0;color:var(--parchment);}
+  .sheet-header p{margin:3px 0 0;color:var(--parchment-dark);font-size:11.5px;opacity:.75;}
+
+  .tabs{display:flex;flex-wrap:wrap;gap:0;border:1px solid #b8ac83;background:var(--parchment-card);margin-bottom:16px;}
+  .tab{flex:1 1 auto;text-align:center;padding:9px 10px;font-size:10.5px;letter-spacing:.05em;font-weight:700;color:var(--ink-soft);cursor:pointer;border-right:1px solid #d9cca0;white-space:nowrap;}
+  .tab:last-child{border-right:none;}
+  .tab:hover{background:#e4d8ae;color:var(--ink);}
+  .tab.active{background:var(--green-btn);color:var(--parchment);}
+
+  .panel{border:1px solid #b8ac83;background:var(--parchment-card);}
+  .panel-head{display:flex;justify-content:space-between;padding:9px 14px;font-size:9.5px;letter-spacing:.09em;color:var(--ink-soft);border-bottom:1px solid #d9cca0;font-weight:700;}
+  .panel-body{padding:14px;}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#d9cca0;}
+  @media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr);} .sidebar{width:180px;}}
+  @media(max-width:640px){.grid{grid-template-columns:1fr;} #appShell{flex-direction:column;} .sidebar{width:100%;flex-direction:row;flex-wrap:wrap;}}
+
+  .card{background:var(--parchment-card);padding:14px 16px 12px;}
+  .card-name{font-size:13px;font-weight:700;color:var(--ink);}
+  .card-sub{font-size:9px;letter-spacing:.06em;color:var(--ink-soft);text-transform:uppercase;margin-top:2px;}
+  .qty-row{display:flex;align-items:stretch;border:1px solid #b8ac83;margin:10px 0 6px;}
+  .qty-btn{width:32px;background:var(--green-btn);color:var(--parchment);border:none;font-size:15px;font-weight:700;cursor:pointer;}
+  .qty-btn:hover{background:var(--green-btn-dark);}
+  .qty-btn:disabled{opacity:.35;cursor:not-allowed;}
+  .qty-val{flex:1;text-align:center;background:var(--parchment);font-family:Georgia,serif;font-size:16px;display:flex;align-items:center;justify-content:center;}
+
+  .empty-state{padding:40px 20px;text-align:center;color:var(--ink-soft);font-size:12px;grid-column:1/-1;}
+
+  table.roster{width:100%;border-collapse:collapse;font-size:11.5px;}
+  table.roster th{text-align:left;font-size:9.5px;letter-spacing:.08em;color:var(--ink-soft);border-bottom:1px solid #d9cca0;padding:8px;}
+  table.roster td{padding:8px;border-bottom:1px solid #e3d9b6;}
+  .role-badge{display:inline-block;padding:3px 8px;font-size:9.5px;font-weight:700;letter-spacing:.05em;background:var(--olive-mid);color:var(--parchment);}
+
+  .role-card{border:1px solid #b8ac83;background:var(--parchment);padding:12px 14px;margin-bottom:10px;}
+  .role-card h4{margin:0 0 8px;font-family:Georgia,serif;font-size:14px;}
+  .perm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;}
+  .perm-check{display:flex;align-items:center;gap:6px;font-size:10.5px;}
+
+  .report-card{border:1px solid #b8ac83;background:var(--parchment);padding:12px 14px;margin-bottom:10px;}
+  .report-card .rt-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;}
+  .report-card h4{margin:0;font-family:Georgia,serif;font-size:14px;}
+  .status-pill{font-size:9px;font-weight:700;letter-spacing:.05em;padding:2px 8px;text-transform:uppercase;}
+  .status-pill.new{background:var(--red-stamp);color:#fff;}
+  .status-pill.reviewed{background:var(--blue-status);color:#fff;}
+  .status-pill.archived{background:#9a916f;color:#fff;}
+  .report-meta{font-size:9.5px;color:var(--ink-soft);margin-top:2px;}
+  .report-desc{font-size:12px;margin-top:8px;white-space:pre-wrap;}
+
+  /* ---------- Map ---------- */
+  .map-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 14px;background:var(--parchment-card);border-bottom:1px solid #d9cca0;}
+  .map-toolbar select{width:auto;max-width:200px;}
+  .tool-btn{padding:7px 10px;font-size:10px;font-weight:700;letter-spacing:.04em;background:var(--parchment);border:1px solid #b8ac83;cursor:pointer;}
+  .tool-btn.active{background:var(--green-btn);color:var(--parchment);}
+  .map-canvas-wrap{position:relative;height:520px;overflow:hidden;background:#202213;cursor:grab;}
+  .map-canvas-wrap.dragging{cursor:grabbing;}
+  #mapCanvas{position:absolute;top:0;left:0;}
+  .map-hint{position:absolute;bottom:8px;left:10px;font-size:10px;color:var(--parchment-dark);opacity:.7;background:rgba(0,0,0,.4);padding:4px 8px;}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--green-btn-dark);color:var(--parchment);padding:10px 18px;font-size:11.5px;letter-spacing:.04em;box-shadow:0 8px 22px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .25s ease, bottom .25s ease;z-index:80;}
+  .toast.show{opacity:1;bottom:32px;}
+  .toast.error{background:var(--red-stamp);}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(20,20,10,.55);display:none;align-items:center;justify-content:center;z-index:90;padding:16px;}
+  .modal-bg.show{display:flex;}
+  .modal{background:var(--parchment);border:1px solid #b8ac83;box-shadow:0 20px 50px rgba(0,0,0,.5);width:100%;max-width:420px;max-height:88vh;overflow-y:auto;padding:22px 22px 20px;}
+  .modal h3{margin:0 0 6px;font-family:Georgia,serif;font-size:17px;}
+  .modal-actions{display:flex;gap:8px;margin-top:18px;justify-content:flex-end;}
+
+  .invite-row{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid #b8ac83;background:var(--parchment);padding:8px 10px;margin-bottom:6px;font-size:11px;}
+  .invite-code{font-family:Georgia,serif;font-weight:700;letter-spacing:.05em;}
+</style>
+</head>
+<body>
+
+<!-- ============================= AUTH ============================= -->
+<div id="authScreen">
+  <div class="auth-card">
+    <div class="auth-seal">CW</div>
+    <div class="auth-title">Colonial War Office</div>
+    <div class="auth-sub">COMMAND NETWORK ACCESS</div>
+    <div class="auth-toggle">
+      <button id="authTabLogin" class="active">SIGN IN</button>
+      <button id="authTabSignup">ENLIST (SIGN UP)</button>
+    </div>
+    <div id="signupUsernameWrap" class="hidden">
+      <label>Callsign / Username</label>
+      <input type="text" id="authUsername" placeholder="e.g. Ashworth">
+    </div>
+    <label>Email</label>
+    <input type="email" id="authEmail" placeholder="you@example.com">
+    <label>Password</label>
+    <input type="password" id="authPassword" placeholder="••••••••">
+    <button class="btn auth-submit" id="authSubmitBtn">SIGN IN</button>
+    <div class="auth-error hidden" id="authError"></div>
+  </div>
+</div>
+
+<!-- ============================= ONBOARDING ============================= -->
+<div id="onboardScreen" class="hidden">
+  <div class="onboard-card">
+    <div class="auth-title">Welcome, <span id="onboardUsername"></span></div>
+    <div class="auth-sub">CHOOSE HOW TO PROCEED</div>
+    <div class="onboard-options" id="onboardMain">
+      <div class="onboard-opt" id="optJoin">
+        <h4>Join a Regiment</h4>
+        <p>Enter an invite code given to you by a Commander or Officer.</p>
+      </div>
+      <div class="onboard-opt" id="optCreate">
+        <h4>Create a Regiment</h4>
+        <p>Start a new regiment and become its Commander.</p>
+      </div>
+      <div class="onboard-opt" id="optStandalone">
+        <h4>Standalone Ledger</h4>
+        <p>A private ledger just for you, not tied to any regiment.</p>
+      </div>
+    </div>
+    <div class="onboard-form hidden" id="onboardJoinForm">
+      <button class="onboard-back">← BACK</button>
+      <label>Invite Code</label>
+      <input type="text" id="joinCodeInput" placeholder="e.g. 7X2K-9PLM">
+      <button class="btn auth-submit" id="joinCodeBtn">JOIN REGIMENT</button>
+    </div>
+    <div class="onboard-form hidden" id="onboardCreateForm">
+      <button class="onboard-back">← BACK</button>
+      <label>Regiment Name</label>
+      <input type="text" id="createRegNameInput" placeholder="e.g. 3rd Colonial Rifles">
+      <button class="btn auth-submit" id="createRegBtn">CREATE REGIMENT</button>
+    </div>
+    <div class="auth-error hidden" id="onboardError"></div>
+  </div>
+</div>
+
+<!-- ============================= APP SHELL ============================= -->
+<div id="appShell">
+  <div class="sidebar">
+    <div class="sidebar-brand"><div class="seal">CW</div><div class="name">WAR OFFICE</div></div>
+    <div>
+      <div class="sidebar-section-label">CONTEXTS</div>
+      <div id="contextList"></div>
+      <div class="sidebar-add" id="addContextBtn">+ Join / Create Regiment</div>
+    </div>
+    <div class="sidebar-footer">
+      Signed in as <span id="footerUsername"></span><br>
+      <button id="signOutBtn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="main-area">
+    <div class="sheet-header">
+      <div>
+        <h1 id="ctxTitle">—</h1>
+        <p id="ctxSub">—</p>
+      </div>
+    </div>
+
+    <div class="tabs" id="mainTabs"></div>
+
+    <!-- LEDGER TAB -->
+    <div id="tabLedger">
+      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+        <input type="text" id="ledgerSearch" placeholder="Search items..." style="flex:1;min-width:180px;">
+        <select id="ledgerCatFilter" style="max-width:220px;"></select>
+        <button class="btn" id="addItemBtn">＋ ADD LINE</button>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span id="ledgerPanelTitle">INVENTORY</span><span id="ledgerPanelCount">0 lines</span></div>
+        <div class="grid" id="ledgerGrid"></div>
+      </div>
+    </div>
+
+    <!-- ROSTER TAB -->
+    <div id="tabRoster" class="hidden">
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-head"><span>REGIMENT ROSTER</span><span id="rosterCount">0 members</span></div>
+        <div class="panel-body">
+          <table class="roster" id="rosterTable"><thead><tr><th>Callsign</th><th>Role</th><th>Joined</th><th></th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+      <div class="panel hidden" id="inviteCodesPanel">
+        <div class="panel-head"><span>INVITE CODES</span><button class="btn small" id="newInviteBtn">+ NEW CODE</button></div>
+        <div class="panel-body" id="inviteCodesList"></div>
+      </div>
+    </div>
+
+    <!-- ROLES TAB -->
+    <div id="tabRoles" class="hidden">
+      <div style="margin-bottom:12px;"><button class="btn" id="newRoleBtn">＋ NEW ROLE</button></div>
+      <div id="rolesList"></div>
+    </div>
+
+    <!-- MAP TAB -->
+    <div id="tabMap" class="hidden">
+      <div class="panel">
+        <div class="map-toolbar">
+          <select id="opSelect"></select>
+          <button class="btn small ghost" id="newOpBtn">+ New Op</button>
+          <button class="btn small ghost" id="uploadMapBtn">Upload Map Image</button>
+          <input type="file" id="mapImageInput" accept="image/*" class="hidden">
+          <span style="flex:1"></span>
+          <button class="tool-btn" data-tool="pan">✋ Pan</button>
+          <button class="tool-btn" data-tool="marker">📍 Marker</button>
+          <button class="tool-btn" data-tool="line">／ Line</button>
+          <button class="tool-btn" data-tool="zone">▭ Zone</button>
+          <button class="tool-btn" data-tool="text">Ａ Text</button>
+          <button class="btn small danger" id="clearSelToolBtn">Delete Selected</button>
+        </div>
+        <div class="map-canvas-wrap" id="mapWrap">
+          <canvas id="mapCanvas" width="1400" height="900"></canvas>
+          <div class="map-hint">Scroll to zoom · Drag to pan (Pan tool) · Click to place with a tool selected</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- REPORTS TAB -->
+    <div id="tabReports" class="hidden">
+      <div style="margin-bottom:12px;"><button class="btn" id="newReportBtn">＋ FILE FIELD REPORT</button></div>
+      <div class="tabs" id="reportFilterTabs" style="max-width:400px;">
+        <div class="tab active" data-status="new">NEW</div>
+        <div class="tab" data-status="reviewed">REVIEWED</div>
+        <div class="tab" data-status="archived">ARCHIVED</div>
+        <div class="tab" data-status="all">ALL</div>
+      </div>
+      <div id="reportsList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= MODALS ============================= -->
+<div class="modal-bg" id="addItemModal">
+  <div class="modal">
+    <h3>Add Ledger Line</h3>
+    <label>Item Name</label><input type="text" id="newItemName">
+    <label>Category</label><select id="newItemCat"></select>
+    <label>Subtitle (optional)</label><input type="text" id="newItemSub">
+    <div class="modal-actions"><button class="btn ghost modal-cancel">CANCEL</button><button class="btn" id="confirmAddItemBtn">ADD</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="roleModal">
+  <div class="modal">
+    <h3 id="roleModalTitle">New Role</h3>
+    <label>Role Name</label><input type="text" id="roleNameInput">
+    <label>Permissions</label>
+    <div class="perm-grid" id="roleModalPerms"></div>
+    <div class="modal-actions"><button class="btn ghost modal-cancel">CANCEL</button><button class="btn" id="confirmRoleBtn">SAVE ROLE</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="reportModal">
+  <div class="modal">
+    <h3>File Field Report</h3>
+    <label>Title</label><input type="text" id="reportTitle">
+    <label>Type</label>
+    <select id="reportType"><option value="intel">Intel</option><option value="contact">Enemy Contact</option><option value="logistics">Logistics</option><option value="other">Other</option></select>
+    <label>Description</label><textarea id="reportDesc" rows="5"></textarea>
+    <div class="modal-actions"><button class="btn ghost modal-cancel">CANCEL</button><button class="btn" id="confirmReportBtn">SUBMIT</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="newOpModal">
+  <div class="modal">
+    <h3>New Operation</h3>
+    <label>Operation Name</label><input type="text" id="newOpName">
+    <label>Description (optional)</label><textarea id="newOpDesc" rows="3"></textarea>
+    <div class="modal-actions"><button class="btn ghost modal-cancel">CANCEL</button><button class="btn" id="confirmNewOpBtn">CREATE</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ==========================================================================
+   SUPABASE CLIENT
+========================================================================== */
+const supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+let toastTimer;
+function showToast(msg, isError){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.toggle('error', !!isError);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('show'), 2200);
+}
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function fmt(n){ return Number(n||0).toLocaleString('en-US'); }
+function $(sel, root){ return (root||document).querySelector(sel); }
+function $all(sel, root){ return [...(root||document).querySelectorAll(sel)]; }
+
+/* ==========================================================================
+   CATALOG (seeded into every new ledger)
+========================================================================== */
+const CATEGORIES = [
+  { id:'aircraft', label:'Aircraft', icon:'✈' },
+  { id:'tanks', label:'Tanks', icon:'▦' },
+  { id:'vehicles', label:'Vehicles', icon:'⛟' },
+  { id:'ships', label:'Ships', icon:'⚓' },
+  { id:'materials', label:'Materials', icon:'◆' },
+  { id:'supplies', label:'Supplies', icon:'⛨' },
+  { id:'weapons', label:'Weapons', icon:'⚔' },
+  { id:'ammunition', label:'Ammunition', icon:'●' },
+  { id:'uniforms', label:'Uniforms', icon:'⚑' },
+  { id:'facility', label:'Facility', icon:'⌂' },
+];
+const DEFAULT_ITEMS = {
+  aircraft:[['Scout Aircraft','Aircraft · Tiny'],['Fighter Aircraft','Aircraft · Small'],['Transport Aircraft','Aircraft · Large'],['Heavy Bomber Aircraft','Aircraft · Large']],
+  tanks:[['Tankette','Tank · Light AFV'],['Light Tank','Tank · Armour'],['Battle Tank','Tank · Heavy Armour'],['Super Tank','Tank · Super Heavy']],
+  vehicles:[['Motorcycle','Vehicle · Scout'],['Truck','Vehicle · Logistics'],['Fuel Tanker','Vehicle · Logistics'],['Construction Vehicle','Vehicle · Engineering'],['Ambulance','Vehicle · Support']],
+  ships:[['Motorboat','Ship · Scout'],['Gunboat','Ship · Combat'],['Freighter','Ship · Logistics'],['Destroyer','Large Ship · Combat'],['Battleship','Large Ship · Combat']],
+  materials:[['Basic Materials','Material · Refined (Bmats)'],['Refined Materials','Material · Refined (Rmats)'],['Components','Material · Refined'],['Steel','Material · Refined'],['Diesel','Material · Refined Liquid']],
+  supplies:[['Soldier Supplies','Supplies · General'],['Medical Supplies','Supplies · Medical'],['Bandages','Supplies · Medical'],['Radio','Supplies · Utility']],
+  weapons:[['Rifle','Weapon · Infantry'],['Submachine Gun','Weapon · Infantry'],['Light Machine Gun','Weapon · Support'],['Rocket Launcher','Weapon · Support']],
+  ammunition:[['Rifle Rounds','Ammunition · Small Arms'],['MG Belt','Ammunition · Support'],['Mortar Shell','Ammunition · Artillery'],['Grenade','Ammunition · Explosive']],
+  uniforms:[['Infantry Uniform','Uniform · Standard'],['Officer Uniform','Uniform · Command'],['Helmet','Uniform · Accessory']],
+  facility:[['Storage Depot','Facility · Logistics'],['Garage','Facility · Production'],['Bunker','Facility · Defense'],['Trench','Facility · Defense']],
+};
+const ALL_PERMISSIONS = [
+  {key:'manage_roster', label:'Manage Roster'},
+  {key:'manage_roles', label:'Manage Roles'},
+  {key:'manage_invites', label:'Manage Invite Codes'},
+  {key:'edit_ledger', label:'Edit Ledger Quantities'},
+  {key:'manage_ledger', label:'Manage Ledger Catalog'},
+  {key:'view_map', label:'View Tactical Map'},
+  {key:'edit_map', label:'Edit Tactical Map'},
+  {key:'manage_ops', label:'Manage Operations'},
+  {key:'submit_reports', label:'Submit Field Reports'},
+  {key:'view_reports', label:'View Field Reports'},
+  {key:'manage_reports', label:'Manage Field Reports'},
+];
+
+/* ==========================================================================
+   GLOBAL STATE
+========================================================================== */
+let currentUser = null;   // { id, email }
+let currentProfile = null; // { username }
+let contexts = [];         // [{type:'regiment', id, name, permissions:Set}] | [{type:'personal', ledgerId}]
+let activeContext = null;
+let activeTab = 'ledger';
+let ledgerItems = [];
+let ledgerWarehouses = [];
+let currentLedgerId = null;
+let realtimeChannels = [];
+
+/* ==========================================================================
+   AUTH
+========================================================================== */
+let authMode = 'login';
+$('#authTabLogin').addEventListener('click', ()=>{ authMode='login'; $('#authTabLogin').classList.add('active'); $('#authTabSignup').classList.remove('active'); $('#signupUsernameWrap').classList.add('hidden'); $('#authSubmitBtn').textContent='SIGN IN'; });
+$('#authTabSignup').addEventListener('click', ()=>{ authMode='signup'; $('#authTabSignup').classList.add('active'); $('#authTabLogin').classList.remove('active'); $('#signupUsernameWrap').classList.remove('hidden'); $('#authSubmitBtn').textContent='ENLIST'; });
+
+$('#authSubmitBtn').addEventListener('click', async ()=>{
+  const email = $('#authEmail').value.trim();
+  const password = $('#authPassword').value;
+  const errEl = $('#authError');
+  errEl.classList.add('hidden');
+  if(!email || !password){ errEl.textContent='Enter an email and password.'; errEl.classList.remove('hidden'); return; }
+  try{
+    if(authMode==='signup'){
+      const username = $('#authUsername').value.trim() || email.split('@')[0];
+      const { error } = await supabase.auth.signUp({ email, password, options:{ data:{ username } } });
+      if(error) throw error;
+      showToast('Account created — check your email if confirmation is required.');
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if(error) throw error;
+    }
+  }catch(e){
+    errEl.textContent = e.message || 'Something went wrong.';
+    errEl.classList.remove('hidden');
+  }
+});
+
+$('#signOutBtn').addEventListener('click', async ()=>{
+  await supabase.auth.signOut();
+  location.reload();
+});
+
+supabase.auth.onAuthStateChange((event, session)=>{
+  if(session && session.user){
+    currentUser = session.user;
+    initSession();
+  }
+});
+
+async function initSession(){
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+  currentProfile = profile;
+  $('#footerUsername').textContent = profile?.username || currentUser.email;
+  $('#onboardUsername').textContent = profile?.username || currentUser.email;
+  await loadContexts();
+}
+
+/* ==========================================================================
+   CONTEXTS (regiments + personal ledger)
+========================================================================== */
+async function loadContexts(){
+  contexts = [];
+
+  const { data: memberships } = await supabase
+    .from('regiment_members')
+    .select('regiment_id, role_id, regiments(name), regiment_roles(name, permissions, is_commander_role)')
+    .eq('user_id', currentUser.id);
+
+  (memberships||[]).forEach(m=>{
+    const perms = new Set(m.regiment_roles?.is_commander_role ? ALL_PERMISSIONS.map(p=>p.key) : (m.regiment_roles?.permissions||[]));
+    contexts.push({ type:'regiment', id:m.regiment_id, name:m.regiments?.name || 'Regiment', roleName:m.regiment_roles?.name, permissions:perms });
+  });
+
+  const { data: personalLedger } = await supabase.from('ledgers').select('id').eq('owner_id', currentUser.id).maybeSingle();
+  if(personalLedger){
+    contexts.push({ type:'personal', id:'personal', ledgerId:personalLedger.id, name:'Personal Ledger', permissions:new Set(['edit_ledger','manage_ledger']) });
+  }
+
+  if(contexts.length===0){
+    document.getElementById('authScreen').style.display='none';
+    document.getElementById('onboardScreen').classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('authScreen').style.display='none';
+  document.getElementById('onboardScreen').classList.add('hidden');
+  document.getElementById('appShell').classList.add('active');
+  renderSidebar();
+  switchContext(contexts[0]);
+}
+
+function renderSidebar(){
+  const list = document.getElementById('contextList');
+  list.innerHTML = contexts.map((c,i)=> `<div class="context-item" data-idx="${i}">${c.type==='personal'?'👤':'🎖'} ${escapeHtml(c.name)}</div>`).join('');
+  $all('.context-item', list).forEach(el=>{
+    el.addEventListener('click', ()=> switchContext(contexts[parseInt(el.dataset.idx)]));
+  });
+}
+
+async function switchContext(ctx){
+  activeContext = ctx;
+  $all('.context-item').forEach(el=> el.classList.toggle('active', contexts[parseInt(el.dataset.idx)]===ctx));
+  $('#ctxTitle').textContent = ctx.name;
+  $('#ctxSub').textContent = ctx.type==='personal' ? 'Private standalone ledger' : `Regiment command · ${ctx.roleName||''}`;
+
+  renderMainTabs();
+  activeTab = 'ledger';
+  showTab('ledger');
+
+  teardownRealtime();
+
+  if(ctx.type==='personal'){
+    currentLedgerId = ctx.ledgerId;
+  } else {
+    const { data: ledger } = await supabase.from('ledgers').select('id').eq('regiment_id', ctx.id).maybeSingle();
+    currentLedgerId = ledger?.id || null;
+  }
+  if(currentLedgerId){ await loadLedger(); setupLedgerRealtime(); }
+}
+
+function renderMainTabs(){
+  const tabs = [{id:'ledger', label:'Ledger'}];
+  if(activeContext.type==='regiment'){
+    tabs.push({id:'roster', label:'Roster'});
+    if(activeContext.permissions.has('manage_roles')) tabs.push({id:'roles', label:'Roles'});
+    if(activeContext.permissions.has('view_map')) tabs.push({id:'map', label:'Tactical Map'});
+    if(activeContext.permissions.has('submit_reports') || activeContext.permissions.has('view_reports')) tabs.push({id:'reports', label:'Reports'});
+  }
+  const el = document.getElementById('mainTabs');
+  el.innerHTML = tabs.map(t=> `<div class="tab${t.id===activeTab?' active':''}" data-tab="${t.id}">${t.label.toUpperCase()}</div>`).join('');
+  $all('.tab', el).forEach(t=> t.addEventListener('click', ()=>{ activeTab=t.dataset.tab; showTab(activeTab); }));
+}
+
+function showTab(tab){
+  ['ledger','roster','roles','map','reports'].forEach(t=> document.getElementById('tab'+capitalize(t)).classList.toggle('hidden', t!==tab));
+  $all('#mainTabs .tab').forEach(el=> el.classList.toggle('active', el.dataset.tab===tab));
+  if(tab==='roster') loadRoster();
+  if(tab==='roles') loadRoles();
+  if(tab==='map') loadMapTab();
+  if(tab==='reports') loadReports();
+}
+function capitalize(s){ return s[0].toUpperCase()+s.slice(1); }
+
+function teardownRealtime(){
+  realtimeChannels.forEach(ch=> supabase.removeChannel(ch));
+  realtimeChannels = [];
+}
+
+/* ==========================================================================
+   ONBOARDING
+========================================================================== */
+document.getElementById('optJoin').addEventListener('click', ()=> onboardShow('onboardJoinForm'));
+document.getElementById('optCreate').addEventListener('click', ()=> onboardShow('onboardCreateForm'));
+document.getElementById('optStandalone').addEventListener('click', createStandaloneLedger);
+$all('.onboard-back').forEach(b=> b.addEventListener('click', ()=> onboardShow(null)));
+
+function onboardShow(id){
+  document.getElementById('onboardMain').classList.toggle('hidden', !!id);
+  document.getElementById('onboardJoinForm').classList.add('hidden');
+  document.getElementById('onboardCreateForm').classList.add('hidden');
+  if(id) document.getElementById(id).classList.remove('hidden');
+}
+
+document.getElementById('joinCodeBtn').addEventListener('click', async ()=>{
+  const code = $('#joinCodeInput').value.trim();
+  if(!code) return;
+  try{
+    const { error } = await supabase.rpc('redeem_invite_code', { p_code: code });
+    if(error) throw error;
+    showToast('Joined regiment');
+    await loadContexts();
+  }catch(e){
+    $('#onboardError').textContent = e.message; $('#onboardError').classList.remove('hidden');
+  }
+});
+
+document.getElementById('createRegBtn').addEventListener('click', async ()=>{
+  const name = $('#createRegNameInput').value.trim();
+  if(!name) return;
+  try{
+    const { data: regId, error } = await supabase.rpc('create_regiment', { p_name: name });
+    if(error) throw error;
+    await seedLedgerCatalog(await createLedgerFor({ regiment_id: regId }));
+    showToast('Regiment created');
+    await loadContexts();
+  }catch(e){
+    $('#onboardError').textContent = e.message; $('#onboardError').classList.remove('hidden');
+  }
+});
+
+async function createStandaloneLedger(){
+  try{
+    const ledgerId = await createLedgerFor({ owner_id: currentUser.id });
+    await seedLedgerCatalog(ledgerId);
+    showToast('Personal ledger created');
+    await loadContexts();
+  }catch(e){
+    $('#onboardError').textContent = e.message; $('#onboardError').classList.remove('hidden');
+  }
+}
+
+async function createLedgerFor(fields){
+  const { data, error } = await supabase.from('ledgers').insert(fields).select().single();
+  if(error) throw error;
+  return data.id;
+}
+
+async function seedLedgerCatalog(ledgerId){
+  const rows = [];
+  Object.keys(DEFAULT_ITEMS).forEach(cat=>{
+    DEFAULT_ITEMS[cat].forEach(([name,sub])=> rows.push({ ledger_id: ledgerId, category:cat, name, sub, qty:0 }));
+  });
+  const { error } = await supabase.from('ledger_items').insert(rows);
+  if(error) throw error;
+}
+
+/* ==========================================================================
+   LEDGER TAB
+========================================================================== */
+const ledgerCatFilter = document.getElementById('ledgerCatFilter');
+ledgerCatFilter.innerHTML = `<option value="">All Categories</option>` + CATEGORIES.map(c=> `<option value="${c.id}">${c.icon} ${c.label}</option>`).join('');
+ledgerCatFilter.addEventListener('change', renderLedgerGrid);
+document.getElementById('ledgerSearch').addEventListener('input', renderLedgerGrid);
+
+async function loadLedger(){
+  const [{ data: items }, { data: whs }] = await Promise.all([
+    supabase.from('ledger_items').select('*').eq('ledger_id', currentLedgerId).order('category').order('name'),
+    supabase.from('ledger_warehouses').select('*').eq('ledger_id', currentLedgerId),
+  ]);
+  ledgerItems = items || [];
+  ledgerWarehouses = whs || [];
+  renderLedgerGrid();
+}
+
+function setupLedgerRealtime(){
+  const ch = supabase.channel('ledger-'+currentLedgerId)
+    .on('postgres_changes', { event:'*', schema:'public', table:'ledger_items', filter:`ledger_id=eq.${currentLedgerId}` }, loadLedger)
+    .subscribe();
+  realtimeChannels.push(ch);
+}
+
+function renderLedgerGrid(){
+  const term = document.getElementById('ledgerSearch').value.toLowerCase();
+  const catFilter = ledgerCatFilter.value;
+  const canEdit = activeContext.permissions.has('edit_ledger');
+  const canManage = activeContext.permissions.has('manage_ledger');
+  document.getElementById('addItemBtn').classList.toggle('hidden', !canManage);
+
+  let rows = ledgerItems.filter(it => (!term || it.name.toLowerCase().includes(term)) && (!catFilter || it.category===catFilter));
+  document.getElementById('ledgerPanelCount').textContent = rows.length + ' lines shown';
+  const grid = document.getElementById('ledgerGrid');
+  grid.innerHTML = '';
+  if(rows.length===0){ grid.innerHTML = '<div class="empty-state">No matching lines.</div>'; return; }
+
+  rows.forEach(it=>{
+    const cat = CATEGORIES.find(c=>c.id===it.category);
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-name">${escapeHtml(it.name)}</div>
+      <div class="card-sub">${cat?cat.label+' · ':''}${escapeHtml(it.sub||'')}</div>
+      <div class="qty-row">
+        <button class="qty-btn" data-act="dec" data-id="${it.id}" ${canEdit?'':'disabled'}>−</button>
+        <div class="qty-val">${fmt(it.qty)}</div>
+        <button class="qty-btn" data-act="inc" data-id="${it.id}" ${canEdit?'':'disabled'}>+</button>
+      </div>
+      ${canManage ? `<button class="btn small danger" data-remove="${it.id}" style="margin-top:4px;">Remove line</button>` : ''}
+    `;
+    grid.appendChild(card);
+  });
+}
+
+document.getElementById('ledgerGrid').addEventListener('click', async e=>{
+  const dec = e.target.closest('[data-act="dec"]'); const inc = e.target.closest('[data-act="inc"]'); const rem = e.target.closest('[data-remove]');
+  if(dec) await changeLedgerQty(dec.dataset.id, -1);
+  if(inc) await changeLedgerQty(inc.dataset.id, 1);
+  if(rem && confirm('Remove this line?')) await removeLedgerItem(rem.dataset.remove);
+});
+
+async function changeLedgerQty(id, delta){
+  const it = ledgerItems.find(x=>x.id===id);
+  if(!it) return;
+  const newQty = Math.max(0, it.qty + delta);
+  const { error } = await supabase.from('ledger_items').update({ qty:newQty }).eq('id', id);
+  if(error){ showToast(error.message, true); return; }
+  await supabase.from('ledger_log').insert({ ledger_id: currentLedgerId, item_name: it.name, qty_delta: delta, actor_id: currentUser.id });
+  it.qty = newQty;
+  renderLedgerGrid();
+}
+async function removeLedgerItem(id){
+  const { error } = await supabase.from('ledger_items').delete().eq('id', id);
+  if(error){ showToast(error.message, true); return; }
+  ledgerItems = ledgerItems.filter(x=>x.id!==id);
+  renderLedgerGrid();
+}
+
+document.getElementById('addItemBtn').addEventListener('click', ()=>{
+  document.getElementById('newItemCat').innerHTML = CATEGORIES.map(c=> `<option value="${c.id}">${c.label}</option>`).join('');
+  $('#newItemName').value=''; $('#newItemSub').value='';
+  document.getElementById('addItemModal').classList.add('show');
+});
+document.getElementById('confirmAddItemBtn').addEventListener('click', async ()=>{
+  const name = $('#newItemName').value.trim();
+  if(!name) return showToast('Enter a name', true);
+  const category = $('#newItemCat').value;
+  const sub = $('#newItemSub').value.trim();
+  const { data, error } = await supabase.from('ledger_items').insert({ ledger_id: currentLedgerId, category, name, sub, qty:0 }).select().single();
+  if(error) return showToast(error.message, true);
+  ledgerItems.push(data);
+  document.getElementById('addItemModal').classList.remove('show');
+  renderLedgerGrid();
+  showToast('Line added');
+});
+
+/* ==========================================================================
+   ROSTER TAB
+========================================================================== */
+async function loadRoster(){
+  const { data: members } = await supabase
+    .from('regiment_members')
+    .select('id, user_id, joined_at, role_id, profiles(username), regiment_roles(name)')
+    .eq('regiment_id', activeContext.id);
+
+  const { data: roles } = await supabase.from('regiment_roles').select('*').eq('regiment_id', activeContext.id).order('rank_order');
+
+  document.getElementById('rosterCount').textContent = (members||[]).length + ' members';
+  const canManage = activeContext.permissions.has('manage_roster');
+  const tbody = document.querySelector('#rosterTable tbody');
+  tbody.innerHTML = (members||[]).map(m=> `
+    <tr>
+      <td>${escapeHtml(m.profiles?.username||'—')}</td>
+      <td>
+        ${canManage
+          ? `<select data-member="${m.id}" class="roleSelect">${roles.map(r=> `<option value="${r.id}" ${r.id===m.role_id?'selected':''}>${escapeHtml(r.name)}</option>`).join('')}</select>`
+          : `<span class="role-badge">${escapeHtml(m.regiment_roles?.name||'—')}</span>`}
+      </td>
+      <td>${new Date(m.joined_at).toLocaleDateString()}</td>
+      <td>${canManage ? `<button class="btn small danger" data-remove-member="${m.id}">Remove</button>` : ''}</td>
+    </tr>
+  `).join('');
+
+  $all('.roleSelect', tbody).forEach(sel=> sel.addEventListener('change', async ()=>{
+    const { error } = await supabase.from('regiment_members').update({ role_id: sel.value }).eq('id', sel.dataset.member);
+    if(error) return showToast(error.message, true);
+    showToast('Role updated');
+  }));
+  $all('[data-remove-member]', tbody).forEach(btn=> btn.addEventListener('click', async ()=>{
+    if(!confirm('Remove this member from the regiment?')) return;
+    const { error } = await supabase.from('regiment_members').delete().eq('id', btn.dataset.removeMember);
+    if(error) return showToast(error.message, true);
+    loadRoster();
+  }));
+
+  document.getElementById('inviteCodesPanel').classList.toggle('hidden', !activeContext.permissions.has('manage_invites'));
+  if(activeContext.permissions.has('manage_invites')) loadInviteCodes();
+}
+
+async function loadInviteCodes(){
+  const { data: codes } = await supabase.from('invite_codes').select('*').eq('regiment_id', activeContext.id).order('created_at', {ascending:false});
+  const list = document.getElementById('inviteCodesList');
+  list.innerHTML = (codes||[]).map(c=> `
+    <div class="invite-row">
+      <span class="invite-code">${escapeHtml(c.code)}</span>
+      <span>${c.uses}${c.max_uses?'/'+c.max_uses:''} uses</span>
+      <span>${c.revoked?'REVOKED':'ACTIVE'}</span>
+      ${!c.revoked ? `<button class="btn small danger" data-revoke="${c.id}">Revoke</button>` : ''}
+    </div>
+  `).join('') || '<div class="empty-state">No invite codes yet.</div>';
+  $all('[data-revoke]', list).forEach(btn=> btn.addEventListener('click', async ()=>{
+    await supabase.from('invite_codes').update({ revoked:true }).eq('id', btn.dataset.revoke);
+    loadInviteCodes();
+  }));
+}
+
+document.getElementById('newInviteBtn').addEventListener('click', async ()=>{
+  const code = Math.random().toString(36).slice(2,6).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();
+  const { error } = await supabase.from('invite_codes').insert({ regiment_id: activeContext.id, code, created_by: currentUser.id });
+  if(error) return showToast(error.message, true);
+  showToast('Invite code created: '+code);
+  loadInviteCodes();
+});
+
+/* ==========================================================================
+   ROLES TAB
+========================================================================== */
+let editingRoleId = null;
+async function loadRoles(){
+  const { data: roles } = await supabase.from('regiment_roles').select('*').eq('regiment_id', activeContext.id).order('rank_order');
+  const list = document.getElementById('rolesList');
+  list.innerHTML = (roles||[]).map(r=> `
+    <div class="role-card">
+      <h4>${escapeHtml(r.name)} ${r.is_commander_role?'<span class="role-badge">FULL CONTROL</span>':''}</h4>
+      <div style="font-size:10.5px;color:var(--ink-soft);margin-bottom:8px;">${r.is_commander_role ? 'Has every permission — this role cannot be edited.' : (r.permissions||[]).map(p=> ALL_PERMISSIONS.find(x=>x.key===p)?.label || p).join(', ') || 'No permissions granted'}</div>
+      ${!r.is_commander_role ? `<button class="btn small ghost" data-edit-role="${r.id}">Edit</button>` : ''}
+    </div>
+  `).join('');
+  $all('[data-edit-role]', list).forEach(btn=> btn.addEventListener('click', ()=> openRoleModal(roles.find(r=>r.id===btn.dataset.editRole))));
+}
+
+document.getElementById('newRoleBtn').addEventListener('click', ()=> openRoleModal(null));
+function openRoleModal(role){
+  editingRoleId = role ? role.id : null;
+  $('#roleModalTitle').textContent = role ? 'Edit Role' : 'New Role';
+  $('#roleNameInput').value = role ? role.name : '';
+  const permsWrap = document.getElementById('roleModalPerms');
+  permsWrap.innerHTML = ALL_PERMISSIONS.map(p=> `
+    <label class="perm-check"><input type="checkbox" value="${p.key}" ${role && (role.permissions||[]).includes(p.key)?'checked':''}> ${p.label}</label>
+  `).join('');
+  document.getElementById('roleModal').classList.add('show');
+}
+document.getElementById('confirmRoleBtn').addEventListener('click', async ()=>{
+  const name = $('#roleNameInput').value.trim();
+  if(!name) return showToast('Enter a role name', true);
+  const perms = $all('#roleModalPerms input:checked').map(i=>i.value);
+  if(editingRoleId){
+    const { error } = await supabase.from('regiment_roles').update({ name, permissions: perms }).eq('id', editingRoleId);
+    if(error) return showToast(error.message, true);
+  } else {
+    const { error } = await supabase.from('regiment_roles').insert({ regiment_id: activeContext.id, name, permissions: perms, rank_order: 99 });
+    if(error) return showToast(error.message, true);
+  }
+  document.getElementById('roleModal').classList.remove('show');
+  showToast('Role saved');
+  loadRoles();
+});
+
+/* ==========================================================================
+   TACTICAL MAP TAB
+========================================================================== */
+let currentOpId = null;
+let mapImage = new Image();
+let mapImageLoaded = false;
+let opElements = [];
+let mapView = { scale:0.5, offsetX:0, offsetY:0 };
+let activeTool = 'pan';
+let selectedElementId = null;
+let dragState = null;
+let lineDraft = null;
+let zoneDraft = null;
+
+async function loadMapTab(){
+  const { data: ops } = await supabase.from('operations').select('*').eq('regiment_id', activeContext.id).order('created_at', {ascending:false});
+  const sel = document.getElementById('opSelect');
+  sel.innerHTML = (ops||[]).map(o=> `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('') || '<option value="">No operations yet</option>';
+  document.getElementById('newOpBtn').classList.toggle('hidden', !activeContext.permissions.has('manage_ops'));
+  document.getElementById('uploadMapBtn').classList.toggle('hidden', !activeContext.permissions.has('manage_ops'));
+  $all('.tool-btn').forEach(b=> b.classList.toggle('hidden', b.dataset.tool!=='pan' && !activeContext.permissions.has('edit_map')));
+  document.getElementById('clearSelToolBtn').classList.toggle('hidden', !activeContext.permissions.has('edit_map'));
+
+  if(ops && ops.length){
+    currentOpId = ops[0].id;
+    await loadOp(ops[0]);
+  } else {
+    currentOpId = null;
+    opElements = [];
+    mapImageLoaded = false;
+    drawMap();
+  }
+  sel.onchange = async ()=>{
+    const op = ops.find(o=>o.id===sel.value);
+    currentOpId = op?.id || null;
+    if(op) await loadOp(op);
+  };
+}
+
+async function loadOp(op){
+  mapImageLoaded = false;
+  if(op.map_image_url){
+    mapImage = new Image();
+    mapImage.crossOrigin = 'anonymous';
+    mapImage.onload = ()=>{ mapImageLoaded = true; drawMap(); };
+    mapImage.src = op.map_image_url;
+  }
+  const { data: elements } = await supabase.from('op_elements').select('*').eq('op_id', op.id);
+  opElements = elements || [];
+  drawMap();
+  setupMapRealtime(op.id);
+}
+
+function setupMapRealtime(opId){
+  const ch = supabase.channel('op-'+opId)
+    .on('postgres_changes', { event:'*', schema:'public', table:'op_elements', filter:`op_id=eq.${opId}` }, async ()=>{
+      const { data } = await supabase.from('op_elements').select('*').eq('op_id', opId);
+      opElements = data || [];
+      drawMap();
+    })
+    .subscribe();
+  realtimeChannels.push(ch);
+}
+
+document.getElementById('newOpBtn').addEventListener('click', ()=>{
+  $('#newOpName').value=''; $('#newOpDesc').value='';
+  document.getElementById('newOpModal').classList.add('show');
+});
+document.getElementById('confirmNewOpBtn').addEventListener('click', async ()=>{
+  const name = $('#newOpName').value.trim();
+  if(!name) return showToast('Enter an operation name', true);
+  const { data, error } = await supabase.from('operations').insert({ regiment_id: activeContext.id, name, description: $('#newOpDesc').value.trim(), created_by: currentUser.id }).select().single();
+  if(error) return showToast(error.message, true);
+  document.getElementById('newOpModal').classList.remove('show');
+  showToast('Operation created');
+  loadMapTab();
+});
+
+document.getElementById('uploadMapBtn').addEventListener('click', ()=> document.getElementById('mapImageInput').click());
+document.getElementById('mapImageInput').addEventListener('change', async e=>{
+  const file = e.target.files[0];
+  if(!file || !currentOpId) return;
+  const path = `${currentOpId}-${Date.now()}-${file.name}`;
+  const { error: upErr } = await supabase.storage.from('map-images').upload(path, file);
+  if(upErr) return showToast(upErr.message, true);
+  const { data: pub } = supabase.storage.from('map-images').getPublicUrl(path);
+  const { error } = await supabase.from('operations').update({ map_image_url: pub.publicUrl }).eq('id', currentOpId);
+  if(error) return showToast(error.message, true);
+  showToast('Map image uploaded');
+  loadMapTab();
+});
+
+$all('.tool-btn').forEach(btn=> btn.addEventListener('click', ()=>{
+  activeTool = btn.dataset.tool;
+  $all('.tool-btn').forEach(b=> b.classList.toggle('active', b===btn));
+  lineDraft = null; zoneDraft = null;
+}));
+
+const canvas = document.getElementById('mapCanvas');
+const ctx = canvas.getContext('2d');
+const mapWrap = document.getElementById('mapWrap');
+
+function resizeCanvas(){
+  canvas.width = mapWrap.clientWidth;
+  canvas.height = mapWrap.clientHeight;
+  drawMap();
+}
+window.addEventListener('resize', resizeCanvas);
+
+function worldToScreen(x,y){ return { x: x*mapView.scale + mapView.offsetX, y: y*mapView.scale + mapView.offsetY }; }
+function screenToWorld(x,y){ return { x: (x-mapView.offsetX)/mapView.scale, y: (y-mapView.offsetY)/mapView.scale }; }
+
+function drawMap(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = '#20221b';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  if(mapImageLoaded){
+    const p = worldToScreen(0,0);
+    ctx.drawImage(mapImage, p.x, p.y, mapImage.width*mapView.scale, mapImage.height*mapView.scale);
+  } else {
+    ctx.fillStyle = '#3a3c22'; ctx.font='13px monospace'; ctx.fillText('No map image uploaded for this operation yet.', 20, 30);
+  }
+
+  opElements.forEach(el=>{
+    const d = el.data || {};
+    const isSel = el.id===selectedElementId;
+    ctx.strokeStyle = isSel ? '#e0bd63' : (d.color||'#c9a24b');
+    ctx.fillStyle = isSel ? '#e0bd63' : (d.color||'#c9a24b');
+    ctx.lineWidth = 2;
+
+    if(el.element_type==='marker'){
+      const p = worldToScreen(d.x, d.y);
+      ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='#f1e9d0'; ctx.font='11px monospace';
+      ctx.fillText(d.label||'', p.x+10, p.y+4);
+    } else if(el.element_type==='line'){
+      const p1 = worldToScreen(d.x1,d.y1), p2 = worldToScreen(d.x2,d.y2);
+      ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.stroke();
+    } else if(el.element_type==='zone'){
+      const p1 = worldToScreen(d.x1,d.y1), p2 = worldToScreen(d.x2,d.y2);
+      ctx.globalAlpha = 0.25;
+      ctx.fillRect(p1.x, p1.y, p2.x-p1.x, p2.y-p1.y);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(p1.x, p1.y, p2.x-p1.x, p2.y-p1.y);
+    } else if(el.element_type==='text'){
+      const p = worldToScreen(d.x, d.y);
+      ctx.font='13px Georgia, serif'; ctx.fillText(d.text||'', p.x, p.y);
+    }
+  });
+
+  if(lineDraft){
+    const p1 = worldToScreen(lineDraft.x1, lineDraft.y1);
+    ctx.strokeStyle='#e0bd63'; ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(lineDraft.curX, lineDraft.curY); ctx.stroke();
+  }
+  if(zoneDraft){
+    const p1 = worldToScreen(zoneDraft.x1, zoneDraft.y1);
+    ctx.strokeStyle='#e0bd63'; ctx.strokeRect(p1.x, p1.y, zoneDraft.curX-p1.x, zoneDraft.curY-p1.y);
+  }
+}
+
+mapWrap.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX-rect.left, my = e.clientY-rect.top;
+  const before = screenToWorld(mx,my);
+  mapView.scale = Math.min(4, Math.max(0.1, mapView.scale * (e.deltaY<0?1.1:0.9)));
+  const after = worldToScreen(before.x, before.y);
+  mapView.offsetX += mx-after.x; mapView.offsetY += my-after.y;
+  drawMap();
+}, { passive:false });
+
+canvas.addEventListener('mousedown', e=>{
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX-rect.left, sy = e.clientY-rect.top;
+  const w = screenToWorld(sx,sy);
+
+  if(activeTool==='pan'){
+    dragState = { startX:e.clientX, startY:e.clientY, ox:mapView.offsetX, oy:mapView.offsetY };
+    mapWrap.classList.add('dragging');
+    return;
+  }
+  if(!activeContext.permissions.has('edit_map') || !currentOpId) return;
+
+  if(activeTool==='marker'){
+    const label = prompt('Marker label (e.g. "3rd Squad", "Enemy AA"):','');
+    if(label===null) return;
+    addElement('marker', { x:w.x, y:w.y, label, color:'#c9a24b' });
+  } else if(activeTool==='text'){
+    const text = prompt('Text label:','');
+    if(!text) return;
+    addElement('text', { x:w.x, y:w.y, text });
+  } else if(activeTool==='line'){
+    if(!lineDraft){ lineDraft = { x1:w.x, y1:w.y, curX:sx, curY:sy }; }
+    else { addElement('line', { x1:lineDraft.x1, y1:lineDraft.y1, x2:w.x, y2:w.y }); lineDraft=null; }
+  } else if(activeTool==='zone'){
+    if(!zoneDraft){ zoneDraft = { x1:w.x, y1:w.y, curX:sx, curY:sy }; }
+    else { addElement('zone', { x1:zoneDraft.x1, y1:zoneDraft.y1, x2:w.x, y2:w.y }); zoneDraft=null; }
+  }
+});
+canvas.addEventListener('mousemove', e=>{
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX-rect.left, sy = e.clientY-rect.top;
+  if(dragState){
+    mapView.offsetX = dragState.ox + (e.clientX-dragState.startX);
+    mapView.offsetY = dragState.oy + (e.clientY-dragState.startY);
+    drawMap();
+  }
+  if(lineDraft){ lineDraft.curX=sx; lineDraft.curY=sy; drawMap(); }
+  if(zoneDraft){ zoneDraft.curX=sx; zoneDraft.curY=sy; drawMap(); }
+});
+window.addEventListener('mouseup', ()=>{ dragState=null; mapWrap.classList.remove('dragging'); });
+
+canvas.addEventListener('click', e=>{
+  if(activeTool!=='pan') return;
+  const rect = canvas.getBoundingClientRect();
+  const w = screenToWorld(e.clientX-rect.left, e.clientY-rect.top);
+  let closest=null, closestDist=16/mapView.scale;
+  opElements.forEach(el=>{
+    if(el.element_type==='marker'){
+      const dx=el.data.x-w.x, dy=el.data.y-w.y, dist=Math.hypot(dx,dy);
+      if(dist<closestDist){ closest=el.id; closestDist=dist; }
+    }
+  });
+  selectedElementId = closest;
+  drawMap();
+});
+
+async function addElement(type, data){
+  const { error } = await supabase.from('op_elements').insert({ op_id: currentOpId, element_type:type, data, created_by: currentUser.id });
+  if(error) showToast(error.message, true);
+}
+document.getElementById('clearSelToolBtn').addEventListener('click', async ()=>{
+  if(!selectedElementId) return showToast('Click a marker (with Pan tool) to select it first', true);
+  await supabase.from('op_elements').delete().eq('id', selectedElementId);
+  selectedElementId = null;
+});
+
+/* ==========================================================================
+   REPORTS TAB
+========================================================================== */
+let reportFilter = 'new';
+$all('#reportFilterTabs .tab').forEach(t=> t.addEventListener('click', ()=>{
+  reportFilter = t.dataset.status;
+  $all('#reportFilterTabs .tab').forEach(x=> x.classList.toggle('active', x===t));
+  loadReports();
+}));
+
+async function loadReports(){
+  document.getElementById('newReportBtn').classList.toggle('hidden', !activeContext.permissions.has('submit_reports'));
+  let query = supabase.from('field_reports').select('*, profiles(username)').eq('regiment_id', activeContext.id).order('created_at', {ascending:false});
+  if(reportFilter!=='all') query = query.eq('status', reportFilter);
+  const { data: reports, error } = await query;
+  const list = document.getElementById('reportsList');
+  if(error){ list.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`; return; }
+  const canManage = activeContext.permissions.has('manage_reports');
+  list.innerHTML = (reports||[]).map(r=> `
+    <div class="report-card">
+      <div class="rt-top">
+        <div><h4>${escapeHtml(r.title)}</h4><div class="report-meta">${escapeHtml(r.report_type)} · filed by ${escapeHtml(r.profiles?.username||'—')} · ${new Date(r.created_at).toLocaleString()}</div></div>
+        <span class="status-pill ${r.status}">${r.status}</span>
+      </div>
+      <div class="report-desc">${escapeHtml(r.description)}</div>
+      ${canManage ? `
+        <div style="margin-top:10px;display:flex;gap:6px;">
+          ${r.status!=='reviewed' ? `<button class="btn small ghost" data-mark="${r.id}:reviewed">Mark Reviewed</button>`:''}
+          ${r.status!=='archived' ? `<button class="btn small ghost" data-mark="${r.id}:archived">Archive</button>`:''}
+          <button class="btn small danger" data-del-report="${r.id}">Delete</button>
+        </div>` : ''}
+    </div>
+  `).join('') || '<div class="empty-state">No reports here.</div>';
+
+  $all('[data-mark]', list).forEach(btn=> btn.addEventListener('click', async ()=>{
+    const [id,status] = btn.dataset.mark.split(':');
+    await supabase.from('field_reports').update({ status }).eq('id', id);
+    loadReports();
+  }));
+  $all('[data-del-report]', list).forEach(btn=> btn.addEventListener('click', async ()=>{
+    if(!confirm('Delete this report?')) return;
+    await supabase.from('field_reports').delete().eq('id', btn.dataset.delReport);
+    loadReports();
+  }));
+}
+
+document.getElementById('newReportBtn').addEventListener('click', ()=>{
+  $('#reportTitle').value=''; $('#reportDesc').value=''; $('#reportType').value='intel';
+  document.getElementById('reportModal').classList.add('show');
+});
+document.getElementById('confirmReportBtn').addEventListener('click', async ()=>{
+  const title = $('#reportTitle').value.trim();
+  if(!title) return showToast('Enter a title', true);
+  const { error } = await supabase.from('field_reports').insert({
+    regiment_id: activeContext.id, submitted_by: currentUser.id, title,
+    report_type: $('#reportType').value, description: $('#reportDesc').value.trim(),
+  });
+  if(error) return showToast(error.message, true);
+  document.getElementById('reportModal').classList.remove('show');
+  showToast('Report filed');
+  loadReports();
+});
+
+/* ==========================================================================
+   MODAL CANCEL / SHARED
+========================================================================== */
+$all('.modal-cancel').forEach(btn=> btn.addEventListener('click', e=> e.target.closest('.modal-bg').classList.remove('show')));
+$all('.modal-bg').forEach(bg=> bg.addEventListener('click', e=>{ if(e.target===bg) bg.classList.remove('show'); }));
+
+document.getElementById('addContextBtn').addEventListener('click', ()=>{
+  document.getElementById('appShell').classList.remove('active');
+  document.getElementById('onboardScreen').classList.remove('hidden');
+  onboardShow(null);
+});
+
+/* Kick off: check for existing session */
+(async ()=>{
+  const { data: { session } } = await supabase.auth.getSession();
+  if(session){ currentUser = session.user; await initSession(); }
+  resizeCanvas();
+})();
+</script>
+</body>
+</html>
