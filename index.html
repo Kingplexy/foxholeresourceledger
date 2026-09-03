@@ -92,18 +92,33 @@
   .sidebar-brand{display:flex;align-items:center;gap:10px;padding:0 4px 12px;border-bottom:1px solid #43451f;}
   .sidebar-brand .seal{width:30px;height:30px;border-radius:50%;border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-weight:700;color:var(--gold);font-size:12px;}
   .sidebar-brand .name{font-family:Georgia,serif;font-size:13px;font-weight:700;}
+  .sidebar-ctx-name{font-family:Georgia,serif;font-size:13.5px;color:var(--gold-bright);padding:0 4px;line-height:1.3;}
   .sidebar-section-label{font-size:9px;letter-spacing:.1em;opacity:.6;padding:0 4px;margin-top:4px;}
   .context-item{
-    padding:9px 10px;font-size:11.5px;cursor:pointer;border-left:3px solid transparent;opacity:.8;
+    padding:9px 10px;font-size:11px;letter-spacing:.03em;font-weight:700;cursor:pointer;
+    border-left:3px solid transparent;opacity:.75;border-radius:0 3px 3px 0;
+    display:flex;align-items:center;gap:8px;
   }
   .context-item:hover{background:#3a3c22;opacity:1;}
-  .context-item.active{background:#3a3c22;border-left-color:var(--gold);opacity:1;color:var(--gold-bright);font-weight:700;}
-  .sidebar-add{padding:9px 10px;font-size:11px;color:var(--gold-bright);cursor:pointer;opacity:.85;}
-  .sidebar-add:hover{opacity:1;}
-  .sidebar-footer{margin-top:auto;padding-top:10px;border-top:1px solid #43451f;font-size:10px;opacity:.7;}
-  .sidebar-footer .footer-actions{display:flex;flex-direction:column;align-items:flex-start;gap:5px;margin-top:8px;}
-  .sidebar-footer button{background:none;border:none;color:var(--parchment);font-size:10px;cursor:pointer;text-decoration:underline;padding:0;text-align:left;}
-  .sidebar-footer #leaveRegimentBtn,.sidebar-footer #deleteLedgerBtn{color:#e0a394;}
+  .context-item.active{background:#3a3c22;border-left-color:var(--gold);opacity:1;color:var(--gold-bright);}
+
+  /* ---------- Sidebar footer ---------- */
+  .sidebar-footer{margin-top:auto;padding-top:12px;border-top:1px solid #43451f;}
+  .sidebar-footer .footer-who{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--parchment-dark);padding:0 2px 4px;}
+  .sidebar-footer .footer-who strong{color:var(--parchment);font-weight:700;}
+  .sidebar-footer .footer-who-icon{font-size:12px;opacity:.8;}
+  .sidebar-footer .footer-actions{display:flex;flex-direction:column;gap:4px;margin-top:6px;}
+  .sidebar-footer button{
+    display:flex;align-items:center;gap:7px;width:100%;text-align:left;
+    background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:3px;
+    color:var(--parchment-dark);font-size:10.5px;letter-spacing:.02em;font-weight:600;
+    padding:7px 9px;cursor:pointer;transition:background .12s ease,border-color .12s ease;
+  }
+  .sidebar-footer button:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14);}
+  .sidebar-footer .danger-link{color:#e0a394;}
+  .sidebar-footer .danger-link:hover{background:rgba(224,163,148,.1);border-color:rgba(224,163,148,.35);}
+  .sidebar-footer .admin-link{color:var(--gold-bright);}
+  .sidebar-footer .admin-link:hover{background:rgba(224,189,99,.1);border-color:rgba(224,189,99,.35);}
 
   .main-area{flex:1;padding:22px 26px 50px;overflow-x:hidden;}
   .sheet-header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:16px;}
@@ -213,6 +228,15 @@
   .doc-actions{display:flex;gap:8px;flex-wrap:wrap;}
   .doc-actions .btn.ghost{color:var(--parchment);}
   .doc-actions .btn.ghost:hover{background:#3a3c22;}
+
+  .help-box{position:relative;background:#3d3f22;border:1px solid var(--gold);color:var(--parchment);padding:12px 34px 12px 14px;margin-bottom:16px;font-size:11.5px;line-height:1.55;}
+  .help-box-title{font-weight:700;color:var(--gold-bright);margin-bottom:4px;letter-spacing:.02em;}
+  .help-box-body{opacity:.92;}
+  .help-box-body strong{color:var(--gold-bright);}
+  .help-box-link{background:none;border:1px solid var(--gold);color:var(--gold-bright);font-family:inherit;font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:2px 7px;cursor:pointer;border-radius:2px;}
+  .help-box-link:hover{background:var(--gold);color:var(--olive-deep);}
+  .help-box-close{position:absolute;top:8px;right:10px;background:none;border:none;color:var(--parchment);opacity:.6;cursor:pointer;font-size:13px;padding:2px 4px;line-height:1;}
+  .help-box-close:hover{opacity:1;}
 
   .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#b8ac83;border:1px solid #b8ac83;margin:0 0 16px;}
   .stat{background:var(--parchment-card);padding:12px 16px;}
@@ -396,18 +420,18 @@
 <div id="appShell">
   <div class="sidebar">
     <div class="sidebar-brand"><div class="seal">CW</div><div class="name">WAR OFFICE</div></div>
+    <div class="sidebar-ctx-name" id="sidebarCtxName">—</div>
     <div>
-      <div class="sidebar-section-label">CONTEXTS</div>
-      <div id="contextList"></div>
-      <div class="sidebar-add" id="addContextBtn">+ Join / Create Regiment</div>
+      <div class="sidebar-section-label">NAVIGATION</div>
+      <div id="mainTabs"></div>
     </div>
     <div class="sidebar-footer">
-      Signed in as <span id="footerUsername"></span>
+      <div class="footer-who"><span class="footer-who-icon">👤</span> Signed in as <strong id="footerUsername"></strong></div>
       <div class="footer-actions">
-        <button id="leaveRegimentBtn" class="hidden">Leave Regiment</button>
-        <button id="deleteLedgerBtn" class="hidden">Delete My Ledger</button>
-        <button id="siteAdminBtn" class="hidden">🛡 Site Admin Panel</button>
-        <button id="signOutBtn">Sign out</button>
+        <button id="leaveRegimentBtn" class="hidden danger-link">🚪 Leave Regiment</button>
+        <button id="deleteLedgerBtn" class="hidden danger-link">🗑 Delete My Ledger</button>
+        <button id="siteAdminBtn" class="hidden admin-link">🛡 Site Admin Panel</button>
+        <button id="signOutBtn">⏻ Sign out</button>
       </div>
     </div>
   </div>
@@ -419,8 +443,6 @@
         <p id="ctxSub">—</p>
       </div>
     </div>
-
-    <div class="tabs" id="mainTabs"></div>
 
     <!-- LEDGER TAB -->
     <div id="tabLedger">
@@ -435,6 +457,14 @@
         <div class="stat"><div class="label">STOCKED LINES</div><div class="value" id="statActive">0</div></div>
         <div class="stat"><div class="label">COLONIAL CATALOG</div><div class="value" id="statCatalog">0</div></div>
         <div class="stat wide"><div class="label">LATEST RECEIPT</div><div class="value" id="statLatest">—</div></div>
+      </div>
+
+      <div class="help-box" id="warehouseHelpBox">
+        <button class="help-box-close" id="warehouseHelpCloseBtn" title="Dismiss">✕</button>
+        <div class="help-box-title">💡 Track where your stockpiles actually are: register a Warehouse</div>
+        <div class="help-box-body">
+          The numbers above are your regiment's <strong>total production</strong> ever logged — not where any of it is sitting right now. To track stock by location, open the <button type="button" class="help-box-link" id="warehouseHelpJumpBtn">🏭 WAREHOUSES</button> tab below, click <strong>＋ ADD LINE</strong> to register your first structure (Storage Depot, Garage, Seaport, etc.), then use the search box inside it to receive items into that warehouse. Warehouse stock is tracked separately from total production, so you always know both how much you've made and where it actually is.
+        </div>
       </div>
 
       <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
@@ -907,18 +937,12 @@ async function loadContexts(){
 }
 
 function renderSidebar(){
-  const list = document.getElementById('contextList');
-  list.innerHTML = contexts.map((c,i)=> `<div class="context-item" data-idx="${i}">${c.type==='personal'?'👤':'🎖'} ${escapeHtml(c.name)}</div>`).join('');
-  $all('.context-item', list).forEach(el=>{
-    el.addEventListener('click', ()=> switchContext(contexts[parseInt(el.dataset.idx)]));
-  });
-  // Each account gets exactly one ledger — join/create is only offered while they have none.
-  document.getElementById('addContextBtn').classList.toggle('hidden', contexts.length>=1);
+  const ctx = contexts[0];
+  document.getElementById('sidebarCtxName').textContent = ctx ? (ctx.type==='personal' ? '👤 '+ctx.name : '🎖 '+ctx.name) : '—';
 }
 
 async function switchContext(ctx){
   activeContext = ctx;
-  $all('.context-item').forEach(el=> el.classList.toggle('active', contexts[parseInt(el.dataset.idx)]===ctx));
   $('#ctxTitle').textContent = ctx.name;
   $('#ctxSub').textContent = ctx.type==='personal' ? 'Private standalone ledger' : `Regiment command · ${ctx.roleName||''}`;
   $('#ledgerEyebrowCtx').textContent = ctx.type==='personal' ? 'PERSONAL STANDALONE LEDGER' : (ctx.name||'').toUpperCase();
@@ -943,21 +967,21 @@ async function switchContext(ctx){
 }
 
 function renderMainTabs(){
-  const tabs = [{id:'ledger', label:'Ledger'}];
+  const tabs = [{id:'ledger', label:'Ledger', icon:'📒'}];
   if(activeContext.type==='regiment'){
-    tabs.push({id:'roster', label:'Roster'});
-    if(activeContext.permissions.has('manage_roles')) tabs.push({id:'roles', label:'Roles'});
-    if(activeContext.permissions.has('view_map')) tabs.push({id:'map', label:'Tactical Map'});
-    if(activeContext.permissions.has('submit_reports') || activeContext.permissions.has('view_reports')) tabs.push({id:'reports', label:'Reports'});
+    tabs.push({id:'roster', label:'Roster', icon:'🎖'});
+    if(activeContext.permissions.has('manage_roles')) tabs.push({id:'roles', label:'Roles', icon:'⚖'});
+    if(activeContext.permissions.has('view_map')) tabs.push({id:'map', label:'Tactical Map', icon:'🗺'});
+    if(activeContext.permissions.has('submit_reports') || activeContext.permissions.has('view_reports')) tabs.push({id:'reports', label:'Reports', icon:'📋'});
   }
   const el = document.getElementById('mainTabs');
-  el.innerHTML = tabs.map(t=> `<div class="tab${t.id===activeTab?' active':''}" data-tab="${t.id}">${t.label.toUpperCase()}</div>`).join('');
-  $all('.tab', el).forEach(t=> t.addEventListener('click', ()=>{ activeTab=t.dataset.tab; showTab(activeTab); }));
+  el.innerHTML = tabs.map(t=> `<div class="context-item${t.id===activeTab?' active':''}" data-tab="${t.id}">${t.icon} ${t.label.toUpperCase()}</div>`).join('');
+  $all('.context-item', el).forEach(t=> t.addEventListener('click', ()=>{ activeTab=t.dataset.tab; showTab(activeTab); }));
 }
 
 function showTab(tab){
   ['ledger','roster','roles','map','reports'].forEach(t=> document.getElementById('tab'+capitalize(t)).classList.toggle('hidden', t!==tab));
-  $all('#mainTabs .tab').forEach(el=> el.classList.toggle('active', el.dataset.tab===tab));
+  $all('#mainTabs .context-item').forEach(el=> el.classList.toggle('active', el.dataset.tab===tab));
   if(tab==='roster') loadRoster();
   if(tab==='roles') loadRoles();
   if(tab==='map'){ resizeCanvas(); loadMapTab(); }
@@ -1256,12 +1280,21 @@ document.getElementById('addSiteAdminBtn').addEventListener('click', async ()=>{
 const ledgerCatTabsEl = document.getElementById('ledgerCatTabs');
 const LEDGER_TABS = [{id:'overview', label:'Overview'}, ...CATEGORIES, {id:'warehouses', label:'Warehouses', icon:'🏭'}];
 ledgerCatTabsEl.innerHTML = LEDGER_TABS.map(c=> `<div class="tab" data-cat="${c.id}">${c.icon?c.icon+' ':''}${c.label.toUpperCase()}</div>`).join('');
-$all('.tab', ledgerCatTabsEl).forEach(t=> t.addEventListener('click', ()=>{
-  ledgerActiveCat = t.dataset.cat;
+function jumpToLedgerCat(catId){
+  ledgerActiveCat = catId;
   ledgerSearchTerm = ''; document.getElementById('ledgerSearch').value = '';
   renderLedgerView();
-}));
+}
+$all('.tab', ledgerCatTabsEl).forEach(t=> t.addEventListener('click', ()=> jumpToLedgerCat(t.dataset.cat)));
 document.getElementById('ledgerSearch').addEventListener('input', e=>{ ledgerSearchTerm = e.target.value.toLowerCase(); renderLedgerView(); });
+
+const WAREHOUSE_HELP_KEY = 'cwHideWarehouseHelp';
+if(localStorage.getItem(WAREHOUSE_HELP_KEY)==='1') document.getElementById('warehouseHelpBox').classList.add('hidden');
+document.getElementById('warehouseHelpCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('warehouseHelpBox').classList.add('hidden');
+  try{ localStorage.setItem(WAREHOUSE_HELP_KEY, '1'); }catch(e){}
+});
+document.getElementById('warehouseHelpJumpBtn').addEventListener('click', ()=> jumpToLedgerCat('warehouses'));
 
 const trackerWhSelect = document.getElementById('trackerWhSelect');
 trackerWhSelect.addEventListener('change', e=>{ trackerWarehouseId = e.target.value || null; renderLedgerView(); });
@@ -2701,11 +2734,6 @@ document.getElementById('confirmReportBtn').addEventListener('click', async ()=>
 $all('.modal-cancel').forEach(btn=> btn.addEventListener('click', e=> e.target.closest('.modal-bg').classList.remove('show')));
 $all('.modal-bg').forEach(bg=> bg.addEventListener('click', e=>{ if(e.target===bg) bg.classList.remove('show'); }));
 
-document.getElementById('addContextBtn').addEventListener('click', ()=>{
-  document.getElementById('appShell').classList.remove('active');
-  document.getElementById('onboardScreen').classList.remove('hidden');
-  onboardShow(null);
-});
 
 /* Kick off: check for existing session */
 (async ()=>{
