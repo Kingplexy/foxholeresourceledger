@@ -471,6 +471,7 @@
       <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
         <div class="doc-actions">
           <button class="btn" id="addItemBtn">＋ ADD LINE</button>
+          <button class="btn ghost" id="syncCatalogBtn" title="Add any catalog items this ledger is missing">🔄 SYNC CATALOG</button>
           <button class="btn ghost" id="exportLedgerBtn">⇩ FILE COPY</button>
           <button class="btn ghost" id="importLedgerBtn">⇧ RESTORE</button>
           <input type="file" id="importLedgerFile" accept="application/json">
@@ -739,16 +740,330 @@ const CATEGORIES = [
   { id:'facility', label:'Facility', icon:'⌂' },
 ];
 const DEFAULT_ITEMS = {
-  aircraft:[['Scout Aircraft','Aircraft · Tiny'],['Fighter Aircraft','Aircraft · Small'],['Transport Aircraft','Aircraft · Large'],['Heavy Bomber Aircraft','Aircraft · Large']],
-  tanks:[['Tankette','Tank · Light AFV'],['Light Tank','Tank · Armour'],['Battle Tank','Tank · Heavy Armour'],['Super Tank','Tank · Super Heavy']],
-  vehicles:[['Motorcycle','Vehicle · Scout'],['Truck','Vehicle · Logistics'],['Fuel Tanker','Vehicle · Logistics'],['Construction Vehicle','Vehicle · Engineering'],['Ambulance','Vehicle · Support']],
-  ships:[['Motorboat','Ship · Scout'],['Gunboat','Ship · Combat'],['Freighter','Ship · Logistics'],['Destroyer','Large Ship · Combat'],['Battleship','Large Ship · Combat']],
-  materials:[['Basic Materials','Material · Refined (Bmats)'],['Refined Materials','Material · Refined (Rmats)'],['Components','Material · Refined'],['Steel','Material · Refined'],['Diesel','Material · Refined Liquid']],
-  supplies:[['Soldier Supplies','Supplies · General'],['Medical Supplies','Supplies · Medical'],['Bandages','Supplies · Medical'],['Radio','Supplies · Utility']],
-  weapons:[['Rifle','Weapon · Infantry'],['Submachine Gun','Weapon · Infantry'],['Light Machine Gun','Weapon · Support'],['Rocket Launcher','Weapon · Support']],
-  ammunition:[['Rifle Rounds','Ammunition · Small Arms'],['MG Belt','Ammunition · Support'],['Mortar Shell','Ammunition · Artillery'],['Grenade','Ammunition · Explosive']],
-  uniforms:[['Infantry Uniform','Uniform · Standard'],['Officer Uniform','Uniform · Command'],['Helmet','Uniform · Accessory']],
-  facility:[['Storage Depot','Facility · Logistics'],['Garage','Facility · Production'],['Bunker','Facility · Defense'],['Trench','Facility · Defense']],
+  aircraft:[
+    ['A51 Venti "Daedalus"','Aircraft · Amphibious Scout'],
+    ['A59 Venti "Perdix"','Aircraft · Scout'],
+    ['Diamon aK-5 "Harpy"','Aircraft · Fighter'],
+    ['Toxot-902 "Blind Silver"','Aircraft · Fighter'],
+    ['Mergo-4 "Myrmidon"','Aircraft · Dive Bomber'],
+    ['V-1 Tzykalia','Aircraft · Heavy Bomber'],
+    ['V-5b Pegasus','Aircraft · Transport'],
+  ],
+  tanks:[
+    ['H-5 "Hatchet"','Tank · Light Armour'],
+    ['H-8 "Kranesca"','Tank · Light Armour'],
+    ['H-10 "Pelekys"','Tank · Light Armour'],
+    ['H-19 "Vulcan"','Tank · Light Armour'],
+    ['HA-1 "Sagaris"','Tank · Light Armour'],
+    ['HC-2 "Scorpion"','Tank · Light Infantry Tank'],
+    ['85K-a "Spatha"','Tank · Assault Armour'],
+    ['85K-b "Falchion"','Tank · Assault Armour'],
+    ['85V-g "Talos"','Tank · Assault Armour'],
+    ['86K-a "Bardiche"','Tank · Assault Armour'],
+    ['86K-c "Ranseur"','Tank · Assault Armour'],
+    ['90T-v "Nemesis"','Tank · Assault Armour'],
+    ['HC-7 "Ballista"','Tank · Siege Armour'],
+    ['Lance-25 "Hasta"','Tank · Battle Armour'],
+    ['Lance-36','Tank · Battle Armour'],
+    ['Lance-46 "Sarissa"','Tank · Battle Armour'],
+    ['O-75b "Ares"','Tank · Super-Heavy Armour'],
+    ['T12 "Actaeon" Tankette','Tank · Tankette'],
+    ['T14 "Vesta" Tankette','Tank · Tankette'],
+    ['T20 "Ixion" Tankette','Tank · Tankette'],
+    ['T13 "Deioneus" Rocket Battery','Tank · Rocket Tankette'],
+  ],
+  vehicles:[
+    ['T3 "Xiphos"','Vehicle · Armoured Car'],
+    ['T5 "Percutio"','Vehicle · Armoured Car'],
+    ['T8 "Gemini"','Vehicle · Armoured Car'],
+    ['HH-a "Javelin"','Vehicle · Half-Track'],
+    ['HH-b "Hoplite"','Vehicle · Half-Track'],
+    ['HH-d "Peltast"','Vehicle · Half-Track'],
+    ['AB-8 "Acheron"','Vehicle · Landing APC'],
+    ['AB-11 "Doru"','Vehicle · Landing APC'],
+    ['00MS "Stinger"','Vehicle · Motorcycle'],
+    ['03MM "Caster"','Vehicle · Motorcycle'],
+    ['UV-05a "Argonaut"','Vehicle · Light Utility Vehicle'],
+    ['UV-24 "Icarus"','Vehicle · Light Utility Vehicle'],
+    ['UV-5c "Odyssey"','Vehicle · Light Utility Vehicle'],
+    ['R-12 "Salus"','Vehicle · Ambulance'],
+    ['R-12b "Salva"','Vehicle · Fire Engine'],
+    ['RR-3 "Stolon" Tanker','Vehicle · Fuel Tanker'],
+    ['R-1 Hauler','Vehicle · Logistics Truck'],
+    ['R-5 "Atlas" Hauler','Vehicle · Logistics Truck'],
+    ['R-5b "Sisyphus" Hauler','Vehicle · Logistics Truck'],
+    ['R-9 "Speartip" Escort','Vehicle · Logistics Truck'],
+    ['R-17 "Retiarius" Skirmisher','Vehicle · Logistics Truck'],
+    ['R-15 "Chariot"','Vehicle · Transport Bus'],
+    ['AU-A150 Taurine Rigger','Vehicle · Heavy-Duty Truck'],
+    ['Aegis Steelbreaker K5a','Vehicle · Rail Combat Car'],
+    ['BMS - Universal Assembly Rig','Vehicle · Construction Vehicle'],
+    ['BMS - Fabricator','Vehicle · Advanced Construction Vehicle'],
+    ['BMS - Class 2 Mobile Auto-Crane','Vehicle · Crane'],
+    ['BMS - Overseer Sky-Hauler','Vehicle · Large Crane'],
+    ['BMS - Scrap Hauler','Vehicle · Harvester'],
+    ['Blumfield LK205','Vehicle · Bicycle'],
+    ['BMS - Packmule Flatbed','Vehicle · Flatbed Truck'],
+    ['Rooster - Junkwagon','Vehicle · Trailer'],
+    ['Rooster - Lamploader','Vehicle · Trailer'],
+    ['Rooster - Tumblebox','Vehicle · Trailer'],
+  ],
+  ships:[
+    ['Poseidon','Ship · Aircraft Carrier'],
+    ['Titan','Ship · Battleship'],
+    ['Conqueror','Ship · Destroyer'],
+    ['AC-b "Trident"','Ship · Submarine'],
+    ['Type C "Charon"','Ship · Gunboat'],
+    ['Type B "Lucian"','Ship · Siege Boat'],
+    ['Strider','Ship · Gunship'],
+    ['K-81e "Sombre"','Ship · Infantry Boat'],
+    ['Interceptor PA-12','Ship · Landing Ship'],
+    ['BMS - Grouper','Ship · Motorboat'],
+    ['BMS - Aquatipper','Ship · Barge'],
+    ['BMS - Ironship','Ship · Freighter'],
+    ['Das Krokodil by VAC','Ship · Light Freighter'],
+    ['Bellweather by VAC','Ship · Mine Boat'],
+    ['BMS - Longhook','Ship · Base Ship'],
+    ['BMS - Bluefin','Ship · Storage Ship'],
+    ['BMS - Bowhead','Ship · Resource Ship'],
+  ],
+  materials:[
+    ['Aluminum','Material · Raw Ore'],
+    ['Coal','Material · Raw Ore'],
+    ['Components','Material · Raw Ore'],
+    ['Copper','Material · Raw Ore'],
+    ['Damaged Components','Material · Salvaged Ore'],
+    ['Iron','Material · Raw Ore'],
+    ['Oil','Material · Raw Liquid'],
+    ['Rare Metal','Material · Raw Ore'],
+    ['Salvage','Material · Scrap'],
+    ['Sulfur','Material · Raw Ore'],
+    ['Water','Material · Raw Liquid'],
+    ['Wreckage','Material · Scrap'],
+    ['Basic Materials','Material · Refined Resource (Bmats)'],
+    ['Construction Materials','Material · Refined Resource (Cmats)'],
+    ['Rare Materials','Material · Refined Resource (Rmats)'],
+    ['Refined Materials','Material · Refined Resource'],
+    ['Coke','Material · Refined Fuel Precursor'],
+    ['Diesel','Material · Refined Liquid'],
+    ['Enriched Oil','Material · Refined Liquid'],
+    ['Heavy Oil','Material · Refined Liquid'],
+    ['Petrol','Material · Refined Liquid'],
+    ['Explosive Powder','Material · Ammo Component'],
+    ['Heavy Explosive Powder','Material · Ammo Component'],
+    ['Gravel','Material · Construction Component'],
+    ['Aluminum Alloy','Material · Tech Component'],
+    ['Copper Alloy','Material · Tech Component'],
+    ['Iron Alloy','Material · Tech Component'],
+    ['Assembly Materials I','Material · Construction Component'],
+    ['Assembly Materials II','Material · Construction Component'],
+    ['Assembly Materials III','Material · Construction Component'],
+    ['Assembly Materials IV','Material · Construction Component'],
+    ['Assembly Materials V','Material · Construction Component'],
+    ['Barbed Wire','Material · Defensive Component'],
+    ['Sandbag','Material · Defensive Component'],
+    ['Concrete Materials','Material · Construction Component'],
+    ['Processed Construction Materials','Material · Construction Component'],
+    ['Steel Construction Materials','Material · Structural Component'],
+    ['Metal Beam','Material · Structural Component'],
+    ['Pipe','Material · Structural Component'],
+    ['Rare Alloys','Material · Advanced Component'],
+    ['Thermal Shielding','Material · Advanced Component'],
+    ['Unstable Substances','Material · Experimental Component'],
+  ],
+  supplies:[
+    ['Maintenance Supplies','Supplies · Base Resource'],
+    ['Soldier Supplies','Supplies · Base Resource'],
+    ['Bandages','Supplies · Medical'],
+    ['Blood Plasma','Supplies · Medical'],
+    ['First Aid Kit','Supplies · Medical'],
+    ['Trauma Kit','Supplies · Medical'],
+    ['Radio','Supplies · Utility'],
+    ['Radio Backpack','Supplies · Utility'],
+    ['Binoculars','Supplies · Utility'],
+    ['Gas Mask','Supplies · Utility'],
+    ['Flight Mask','Supplies · Utility'],
+    ['Gas Mask Filter','Supplies · Utility'],
+    ['Hammer','Supplies · Field Tool'],
+    ['Shovel','Supplies · Field Tool'],
+    ['Sledge Hammer','Supplies · Field Tool'],
+    ['Wrench','Supplies · Field Tool'],
+    ['Water Bucket','Supplies · Field Tool'],
+  ],
+  weapons:[
+    ['"Dusk" ce.III','Weapon · Assault Rifle'],
+    ['Volta r.I Repeater','Weapon · Heavy Rifle'],
+    ['KRR2-790 Omen','Weapon · Long Rifle'],
+    ['Ferro 879','Weapon · Pistol'],
+    ['Argenti r.II Rifle','Weapon · Rifle'],
+    ['Catena rt.IV Auto-Rifle','Weapon · Rifle'],
+    ['Fuscina pi.I','Weapon · Rifle'],
+    ['KRF1-750 Dragonfly','Weapon · Shotgun'],
+    ['KRR3-792 Auger','Weapon · Sniper Rifle'],
+    ['"Quickhatch" Rt.I','Weapon · Sniper Rifle (Anti-Tank)'],
+    ['"Lionclaw" mc.VIII','Weapon · SMG'],
+    ['"The Pitch Gun" mc.V','Weapon · SMG'],
+    ['Cometa T2-9','Weapon · Revolver'],
+    ['KRN886-127 Gast Machine Gun','Weapon · Machine Gun'],
+    ['"Dawn" Ve.II','Weapon · Anti-Tank Rifle'],
+    ['"Molten Wind" v.II Flame Torch','Weapon · Flamethrower'],
+    ['"Typhon" ra.XII','Weapon · Mounted Anti-Tank Rifle'],
+    ['Daucus isg.III','Weapon · Mounted Infantry Support Gun'],
+    ['Ignifist 30','Weapon · Anti-Tank RPG'],
+    ['Venom c.II 35','Weapon · Anti-Tank RPG'],
+    ['KLG901-2 Lunaire F','Weapon · Grenade Launcher'],
+    ['Mounted Fissura gd.I','Weapon · Mounted Grenade Launcher'],
+    ['Cremari Mortar','Weapon · Mortar'],
+    ['Fists','Weapon · Melee'],
+    ['Buckhorn CCQ-18','Weapon · Bayonet'],
+    ['Eleos Infantry Dagger','Weapon · Melee'],
+    ['Falias Raiding Club','Weapon · Melee'],
+    ['120-68 "Koronides" Field Gun','Weapon · Field Artillery'],
+    ['AA-2 Battering Ram','Weapon · Field AT Gun'],
+    ['GA6 "Cestus"','Weapon · Field AT Rifle'],
+    ['G40 "Sagittarii"','Weapon · Field Machine Gun'],
+    ['30-250 "Tisiphone" Field Cannon','Weapon · Field Mortar'],
+    ['40-45 "Smelter"','Weapon · Heavy Field Gun'],
+    ['945g "Stygian Bolt"','Weapon · Large Field Gun'],
+    ['40-250 "Alekto" Heavy Cannon','Weapon · Large Field Mortar'],
+  ],
+  ammunition:[
+    ['8mm','Ammunition · Pistol'],
+    ['.44 Mag','Ammunition · Revolver'],
+    ['9mm','Ammunition · SMG'],
+    ['7.62mm','Ammunition · Rifle'],
+    ['7.92mm','Ammunition · Assault Rifle'],
+    ['12.7mm','Ammunition · Machine Gun'],
+    ['14.5mm','Ammunition · Anti-Tank Rifle'],
+    ['20mm','Ammunition · Anti-Air MG'],
+    ['Buckshot','Ammunition · Shotgun'],
+    ['"Molten Wind" v.II Ammo','Ammunition · Flamethrower'],
+    ['912 Shrike Rounds','Ammunition · Dive Bomber'],
+    ['Mark II Raidbreaker','Ammunition · Heavy Bomber'],
+    ['30mm','Ammunition · Infantry Support Gun'],
+    ['40mm','Ammunition · Cannon'],
+    ['68mm','Ammunition · Anti-Tank Cannon'],
+    ['75mm','Ammunition · Large Cannon'],
+    ['94.5mm','Ammunition · Large Anti-Tank Cannon'],
+    ['950-70b Anti-Aircraft Shell','Ammunition · Anti-Air'],
+    ['120mm','Ammunition · Light Artillery'],
+    ['150mm','Ammunition · Heavy Artillery'],
+    ['300mm','Ammunition · Storm Cannon'],
+    ['3C-High Explosive Rocket','Ammunition · Rocket Artillery'],
+    ['4C-Fire Rocket','Ammunition · Incendiary Rocket Artillery'],
+    ['Mortar Shell','Ammunition · Mortar'],
+    ['Shrapnel Mortar Shell','Ammunition · Mortar'],
+    ['Flare Mortar Shell','Ammunition · Mortar'],
+    ['Incendiary Mortar Shell','Ammunition · Mortar'],
+    ['250mm "Fury" Shell','Ammunition · Spigot Mortar'],
+    ['RPG','Ammunition · Rocket'],
+    ['AP/RPG','Ammunition · Anti-Tank Rocket'],
+    ['Bomastone Grenade','Ammunition · Fragmentation Grenade'],
+    ['Tremola Grenade GPb-1','Ammunition · HE Grenade (Launcher)'],
+    ['Mammon 91-b','Ammunition · HE Grenade'],
+    ['Green Ash Grenade','Ammunition · Gas Grenade'],
+    ['PT-815 Smoke Grenade','Ammunition · Smoke Grenade'],
+    ['Anti-Tank Sticky Bomb','Ammunition · AT Grenade'],
+    ["Hydra's Whisper",'Ammunition · Explosive Charge'],
+    ['Havoc Charge','Ammunition · Explosive Charge'],
+    ["Crow's Foot Mine",'Ammunition · Anti-Infantry Mine'],
+    ['Abisme AT-99','Ammunition · Anti-Tank Mine'],
+    ['Moray Torpedo','Ammunition · Torpedo'],
+    ['Quillback Torpedo','Ammunition · Torpedo'],
+    ['E680-S Rudder Lock','Ammunition · Sea Mine'],
+    ['E681-B Hullbreaker Mine','Ammunition · Sea Mine'],
+    ['Model-7 "Evie"','Ammunition · Depth Charge'],
+  ],
+  uniforms:[
+    ['Legionary Fatigues','Uniform · Soldier'],
+    ['Fabri Rucksack','Uniform · Engineer'],
+    ['Medic Fatigues','Uniform · Medic'],
+    ['Recon Camo','Uniform · Scout'],
+    ["Tankman's Coveralls",'Uniform · Tank Crew'],
+    ['Heavy Topcoat','Uniform · Snow/Cold Weather'],
+    ["Legionary's Oilcoat",'Uniform · Rain'],
+    ["Grenadier's Baldric",'Uniform · Grenadier'],
+    ['Velian Flak Vest','Uniform · Armour'],
+    ["Officialis' Attire",'Uniform · Officer'],
+    ['Remex Garb','Uniform · Naval'],
+    ["Lodesman's Lorica",'Uniform · Pilot'],
+    ["Auster's Harness",'Uniform · Paratrooper'],
+  ],
+  facility:[
+    ['Materials Factory','Facility · Production'],
+    ['Metalworks Factory','Facility · Production'],
+    ['Coal Refinery','Facility · Production'],
+    ['Oil Refinery','Facility · Production'],
+    ['Ammunition Factory','Facility · Production'],
+    ['Infantry Kit Factory','Facility · Production'],
+    ['Aircraft Maintenance Factory','Facility · Production'],
+    ['Concrete Mixer','Facility · Production'],
+    ['Small Assembly Station','Facility · Production'],
+    ['Large Assembly Station','Facility · Production'],
+    ['Dry Dock','Facility · Production'],
+    ['Field Modification Center','Facility · Production'],
+    ['A0E-9 Rocket Platform','Facility · Production'],
+    ['Factory','Facility · Production'],
+    ['Garage','Facility · Production'],
+    ['Mass Production Factory','Facility · Production'],
+    ['Refinery','Facility · Production'],
+    ['Shipyard','Facility · Production'],
+    ['Aircraft Hangar','Facility · Production'],
+    ['Construction Yard','Facility · Production'],
+    ['Engineering Center','Facility · Production'],
+    ['Water Pump','Facility · Resource Extraction'],
+    ['Oil Well','Facility · Resource Extraction'],
+    ['Stationary Harvester','Facility · Resource Extraction'],
+    ['Diesel Power Plant','Facility · Power'],
+    ['Power Station','Facility · Power'],
+    ['Liquid Silo','Facility · Storage'],
+    ['Liquid Transfer Station','Facility · Storage'],
+    ['Resource Transfer Station','Facility · Storage'],
+    ['Material Transfer Station','Facility · Storage'],
+    ['Crate Transfer Station','Facility · Storage'],
+    ['Aircraft Depot','Facility · Storage'],
+    ['Seaport','Facility · Storage'],
+    ['Storage Depot','Facility · Storage'],
+    ['Town Base','Facility · Base Structure'],
+    ['Relic Base','Facility · Base Structure'],
+    ['Border Base','Facility · Base Structure'],
+    ['Safe House','Facility · Base Structure'],
+    ['Keep','Facility · Base Structure'],
+    ['Hospital','Facility · Medical Base'],
+    ['Bunker Base','Facility · Forward Base'],
+    ['Encampment','Facility · Forward Base'],
+    ['Medical Room','Facility · Medical'],
+    ['Field Hospital','Facility · Medical'],
+    ['Rifle Pillbox','Facility · Defensive'],
+    ['Machine Gun Pillbox','Facility · Defensive'],
+    ['Anti-Tank Rifle Pillbox','Facility · Defensive'],
+    ['Infantry Support Gun Pillbox','Facility · Defensive'],
+    ['Watch Tower','Facility · Defensive'],
+    ['Rifle Garrison','Facility · Defensive'],
+    ['Machine Gun Garrison','Facility · Defensive'],
+    ['AT Gun Garrison','Facility · Defensive'],
+    ['Artillery Garrison','Facility · Defensive'],
+    ['Observation Bunker','Facility · Defensive'],
+    ['Foxhole','Facility · Passive Defense'],
+    ['Barbed Wire Fence','Facility · Passive Defense'],
+    ['Sandbag Cover','Facility · Passive Defense'],
+    ['Tank Trap','Facility · Passive Defense'],
+    ['Trench','Facility · Passive Defense'],
+    ['Bunker','Facility · Passive Defense'],
+    ['Gate','Facility · Passive Defense'],
+    ['Wall','Facility · Passive Defense'],
+    ["Dragon's Teeth",'Facility · Passive Defense'],
+    ['Minefield','Facility · Passive Defense'],
+    ['Crespine Netting','Facility · Passive Defense'],
+    ['Coastal Gun','Facility · World Defense'],
+    ['Storm Cannon','Facility · Superweapon'],
+    ['DAE 1b-2 "Serra"','Facility · Emplaced Machine Gun'],
+    ['DAE 1o-3 "Polybolos"','Facility · Emplaced AT Cannon'],
+    ['DAE 2a-1 "Ruptura"','Facility · Emplaced Large AT Cannon'],
+    ['50-500 "Thunderbolt" Cannon','Facility · Emplaced Heavy Artillery'],
+    ['DAE 3b-2 "Hades\' Net"','Facility · Emplaced Rocket Artillery'],
+    ['DAE 5b "Zeal"','Facility · Emplaced Anti-Air Cannon'],
+  ],
 };
 const WAREHOUSE_TYPES = [
   { id:'storage-depot', label:'Storage Depot', icon:'🏬', note:'General stockpile — vehicles, materials, supplies, weapons.' },
@@ -1328,6 +1643,7 @@ function renderLedgerView(){
   const canEdit = activeContext.permissions.has('edit_ledger');
   const canManage = activeContext.permissions.has('manage_ledger');
   document.getElementById('addItemBtn').classList.toggle('hidden', !canManage);
+  document.getElementById('syncCatalogBtn').classList.toggle('hidden', !canManage);
   document.getElementById('importLedgerBtn').classList.toggle('hidden', !canManage);
   document.getElementById('resetLedgerBtn').classList.toggle('hidden', !canManage);
 
@@ -1383,10 +1699,15 @@ function renderWhContextBanner(){
   whContextBanner.innerHTML = `<span>📦 Logging to <strong>${escapeHtml(wh.name)}</strong> (${escapeHtml(info.label)}) — counts below reflect this warehouse only.</span><button id="clearWhCtx">SHOW TOTAL PRODUCTION</button>`;
 }
 
+function itemMatchesSearch(it, term){
+  if(!term) return true;
+  return it.name.toLowerCase().includes(term) || (it.sub||'').toLowerCase().includes(term);
+}
+
 function renderLedgerOverview(canEdit, canManage){
   document.getElementById('ledgerPanelTitle').textContent = 'CATALOG OVERVIEW';
   const term = ledgerSearchTerm;
-  let rows = ledgerItems.filter(it=> !term || it.name.toLowerCase().includes(term));
+  let rows = ledgerItems.filter(it=> itemMatchesSearch(it, term));
   rows = rows.slice().sort((a,b)=> effectiveQty(b) - effectiveQty(a) || a.name.localeCompare(b.name));
   document.getElementById('ledgerPanelCount').textContent = rows.length + ' lines shown' + (trackerWarehouseId ? ' · filtered to selected warehouse' : '');
   const grid = document.getElementById('ledgerGrid');
@@ -1400,7 +1721,7 @@ function renderLedgerCategory(cat, canEdit, canManage){
   document.getElementById('ledgerPanelTitle').textContent = (catInfo?catInfo.label:cat).toUpperCase() + ' INVENTORY';
   const term = ledgerSearchTerm;
   const catItems = ledgerItems.filter(it=> it.category===cat);
-  const list = catItems.filter(it=> !term || it.name.toLowerCase().includes(term));
+  const list = catItems.filter(it=> itemMatchesSearch(it, term));
   document.getElementById('ledgerPanelCount').textContent = catItems.length + ' authorized lines' + (trackerWarehouseId ? ' · logging to warehouse' : '');
   const grid = document.getElementById('ledgerGrid');
   grid.innerHTML = '';
@@ -1503,6 +1824,24 @@ document.getElementById('confirmAddItemBtn').addEventListener('click', async ()=
   showToast('Line added');
 });
 
+document.getElementById('syncCatalogBtn').addEventListener('click', async ()=>{
+  if(!confirm('Add any catalog items this ledger is missing (matched by name)? Existing lines and their quantities are left untouched.')) return;
+  const existingKeys = new Set(ledgerItems.map(it=> it.category+'::'+it.name.toLowerCase()));
+  const rows = [];
+  Object.keys(DEFAULT_ITEMS).forEach(cat=>{
+    DEFAULT_ITEMS[cat].forEach(([name,sub])=>{
+      const key = cat+'::'+name.toLowerCase();
+      if(!existingKeys.has(key)){ existingKeys.add(key); rows.push({ ledger_id: currentLedgerId, category:cat, name, sub, qty:0 }); }
+    });
+  });
+  if(rows.length===0){ showToast('Catalog is already up to date'); return; }
+  const { data, error } = await sb.from('ledger_items').insert(rows).select();
+  if(error){ showToast(error.message, true); return; }
+  ledgerItems.push(...(data||[]));
+  renderLedgerView();
+  showToast(`Added ${rows.length} new catalog item${rows.length===1?'':'s'}`);
+});
+
 /* ---------- Stats ---------- */
 function renderLedgerStats(){
   let total=0, activeLines=0;
@@ -1594,7 +1933,7 @@ function renderWhPicker(wh, canEdit){
   const term = whPickerTerm.trim().toLowerCase();
   results.innerHTML = '';
   if(!term){ results.innerHTML = '<div class="wh-picker-empty">Type an item name to receive it into this warehouse.</div>'; return; }
-  const matches = ledgerItems.filter(it=> it.name.toLowerCase().includes(term)).slice(0,25);
+  const matches = ledgerItems.filter(it=> itemMatchesSearch(it, term)).slice(0,25);
   if(matches.length===0){ results.innerHTML = '<div class="wh-picker-empty">No matching items in the catalog.</div>'; return; }
   matches.forEach(it=>{
     const cat = CATEGORIES.find(c=>c.id===it.category);
