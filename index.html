@@ -3068,7 +3068,8 @@ document.getElementById('confirmElementBtn').addEventListener('click', async ()=
     if(type==='marker'){ data.icon = icon; data.label = label; }
     else if(type==='text'){ data.text = label; }
     else { data.label = label; }
-    await updateElement(editingElementId, data);
+    const updated = await updateElement(editingElementId, data);
+    if(!updated) return; // error already shown — keep the modal open
     document.getElementById('elementModal').classList.remove('show');
     editingElementId = null;
     showToast('Updated');
@@ -3083,7 +3084,8 @@ document.getElementById('confirmElementBtn').addEventListener('click', async ()=
   else if(type==='text'){ data.text = label; }
   else { data.label = label; }
 
-  await addElement(type, data);
+  const added = await addElement(type, data);
+  if(!added) return; // addElement already showed the real error — keep the modal open so nothing typed is lost
   document.getElementById('elementModal').classList.remove('show');
   pendingPlacement = null;
   showToast(elementTypeLabel(type)+' added');
@@ -3124,7 +3126,13 @@ async function addElement(type, data){
     drawMap(); renderLegend();
     return localEl;
   }
-  const { data: row, error } = await sb.from('op_elements').insert({ op_id: currentOpId, element_type:type, data, created_by: currentUser.id }).select().single();
+  // Generate the id client-side and insert without chaining .select() — reading a row straight
+  // back after inserting it requires SELECT-policy access on top of the INSERT policy, and a
+  // mismatch between the two (a common RLS gotcha) would otherwise fail silently here: the row
+  // is genuinely saved, but insert().select().single() errors because it can't read it back,
+  // so the element never makes it into view. This avoids needing that read entirely.
+  const row = { id: crypto.randomUUID(), op_id: currentOpId, element_type:type, data, created_by: currentUser.id };
+  const { error } = await sb.from('op_elements').insert(row);
   if(error){ showToast(error.message, true); return null; }
   opElements.push(row);
   drawMap(); renderLegend();
@@ -3132,16 +3140,17 @@ async function addElement(type, data){
 }
 async function updateElement(id, data){
   const el = opElements.find(x=>x.id===id);
-  if(!el) return;
+  if(!el) return false;
   if(String(id).startsWith('local_')){
     el.data = data;
     drawMap(); renderLegend();
-    return;
+    return true;
   }
   const { error } = await sb.from('op_elements').update({ data }).eq('id', id);
-  if(error){ showToast(error.message, true); return; }
+  if(error){ showToast(error.message, true); return false; }
   el.data = data;
   drawMap(); renderLegend();
+  return true;
 }
 async function deleteElement(id){
   if(!String(id).startsWith('local_')){
