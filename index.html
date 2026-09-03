@@ -2428,7 +2428,37 @@ let currentOpRecord = null;
 let currentOps = [];
 let mapImage = new Image();
 let mapImageLoaded = false;
+let mapImageLoadToken = 0;
 let opElements = [];
+
+// Switching operations/regions quickly starts overlapping image loads; a slower, stale request
+// finishing after a newer one would otherwise clobber the correct state. This token guard makes
+// only the most recently *started* load allowed to apply its result.
+function loadMapImage(url, allowCrossOrigin){
+  const token = ++mapImageLoadToken;
+  mapImageLoaded = false;
+  drawMap();
+  const img = new Image();
+  if(allowCrossOrigin) img.crossOrigin = 'anonymous';
+  img.onload = ()=>{
+    if(token !== mapImageLoadToken) return;
+    mapImage = img;
+    mapImageLoaded = true;
+    drawMap();
+  };
+  img.onerror = ()=>{
+    if(token !== mapImageLoadToken) return;
+    mapImageLoaded = false;
+    showToast('Could not load the map image', true);
+    drawMap();
+  };
+  img.src = url;
+}
+function clearMapImage(){
+  mapImageLoadToken++;
+  mapImageLoaded = false;
+  mapImage = new Image();
+}
 let mapView = { scale:0.5, offsetX:0, offsetY:0 };
 let activeTool = 'pan';
 let selectedElementId = null;
@@ -2461,7 +2491,7 @@ function enterScratchMode(regionId){
   currentOpRecord = null;
   opElements = [];
   selectedElementId = null;
-  mapImageLoaded = false;
+  lineDraft = null; zoneDraft = null; pendingPlacement = null; editingElementId = null;
   document.getElementById('opSelect').value = '';
   document.getElementById('opDetailsBar').classList.add('hidden');
   document.getElementById('scratchBar').classList.remove('hidden');
@@ -2470,10 +2500,9 @@ function enterScratchMode(regionId){
   regionSelectEl.value = regionId || '';
   if(regionId){
     const region = regionInfo(regionId);
-    mapImage = new Image();
-    mapImage.onload = ()=>{ mapImageLoaded = true; drawMap(); };
-    mapImage.onerror = ()=> showToast('Could not load the reference image for '+(region?region.label:regionId), true);
-    mapImage.src = region.imageUrl;
+    loadMapImage(region.imageUrl, false);
+  } else {
+    clearMapImage();
   }
   drawMap();
   renderLegend();
@@ -2492,11 +2521,7 @@ regionSelectEl.addEventListener('change', async e=>{
     }
     const { error } = await sb.from('operations').update({ map_image_url: region.imageUrl, region: regionId }).eq('id', currentOpId);
     if(error){ showToast(error.message, true); return; }
-    mapImageLoaded = false;
-    mapImage = new Image();
-    mapImage.onload = ()=>{ mapImageLoaded = true; drawMap(); };
-    mapImage.onerror = ()=> showToast('Could not load the reference image for '+region.label, true);
-    mapImage.src = region.imageUrl;
+    loadMapImage(region.imageUrl, false);
     if(currentOpRecord) currentOpRecord.region = regionId;
     renderOpDetailsBar();
     showToast('Base map updated to '+region.label);
@@ -2557,20 +2582,16 @@ async function loadMapTab(){
 
 async function loadOp(op){
   currentOpRecord = op;
-  mapImageLoaded = false;
   selectedElementId = null;
+  lineDraft = null; zoneDraft = null; pendingPlacement = null; editingElementId = null;
   regionSelectEl.value = op.region || '';
   renderOpDetailsBar();
   if(op.map_image_url){
-    mapImage = new Image();
     // Region reference images come from an external wiki with no CORS headers, so skip crossOrigin
     // for those (uploaded images live in Supabase Storage, which does support it).
-    if(!op.region) mapImage.crossOrigin = 'anonymous';
-    mapImage.onload = ()=>{ mapImageLoaded = true; drawMap(); };
-    mapImage.onerror = ()=>{ mapImageLoaded = false; showToast('Could not load this operation\'s map image', true); };
-    mapImage.src = op.map_image_url;
+    loadMapImage(op.map_image_url, !op.region);
   } else {
-    mapImage = new Image();
+    clearMapImage();
   }
   const { data: elements } = await sb.from('op_elements').select('*').eq('op_id', op.id);
   opElements = elements || [];
@@ -2685,15 +2706,39 @@ window.addEventListener('resize', resizeCanvas);
 function worldToScreen(x,y){ return { x: x*mapView.scale + mapView.offsetX, y: y*mapView.scale + mapView.offsetY }; }
 function screenToWorld(x,y){ return { x: (x-mapView.offsetX)/mapView.scale, y: (y-mapView.offsetY)/mapView.scale }; }
 
+// Map backgrounds are real terrain photos (tans/browns/greens), so a thin line or unstroked
+// text in the accent gold can vanish into it. Everything drawn on top gets a dark halo first
+// so it stays legible regardless of what's underneath or which color the user picked.
+const MAP_HALO = 'rgba(10,10,6,0.8)';
+function haloLine(x1,y1,x2,y2, color, width){
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = MAP_HALO; ctx.lineWidth = width + 2.5;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.strokeStyle = color; ctx.lineWidth = width;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+}
+function haloRect(x,y,w,h, color, width){
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = MAP_HALO; ctx.lineWidth = width + 2.5; ctx.strokeRect(x,y,w,h);
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.strokeRect(x,y,w,h);
+}
+function haloLabel(text, x, y, color, font){
+  ctx.font = font;
+  ctx.lineJoin = 'round'; ctx.miterLimit = 2;
+  ctx.strokeStyle = MAP_HALO; ctx.lineWidth = 3;
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+}
 function drawArrowHead(p1, p2, color){
   const angle = Math.atan2(p2.y-p1.y, p2.x-p1.x);
-  const headLen = 12;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(p2.x, p2.y);
-  ctx.lineTo(p2.x - headLen*Math.cos(angle-Math.PI/7), p2.y - headLen*Math.sin(angle-Math.PI/7));
-  ctx.lineTo(p2.x - headLen*Math.cos(angle+Math.PI/7), p2.y - headLen*Math.sin(angle+Math.PI/7));
-  ctx.closePath(); ctx.fill();
+  const headLen = 13;
+  const left = { x:p2.x - headLen*Math.cos(angle-Math.PI/7), y:p2.y - headLen*Math.sin(angle-Math.PI/7) };
+  const right = { x:p2.x - headLen*Math.cos(angle+Math.PI/7), y:p2.y - headLen*Math.sin(angle+Math.PI/7) };
+  ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(p2.x,p2.y); ctx.lineTo(left.x,left.y); ctx.lineTo(right.x,right.y); ctx.closePath();
+  ctx.strokeStyle = MAP_HALO; ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = color; ctx.fill();
 }
 
 function drawMap(){
@@ -2713,7 +2758,7 @@ function drawMap(){
     const d = el.data || {};
     const isSel = el.id===selectedElementId;
     const color = isSel ? '#e0bd63' : (d.color||'#c9a24b');
-    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = isSel ? 3 : 2;
+    const lineW = isSel ? 3 : 2;
 
     if(el.element_type==='marker'){
       const p = worldToScreen(d.x, d.y);
@@ -2722,44 +2767,38 @@ function drawMap(){
       ctx.fillStyle = '#1c1d11'; ctx.fill();
       ctx.lineWidth = isSel?2.5:1.5; ctx.strokeStyle = color; ctx.stroke();
       drawGlyph(ctx, iconInfo(d.icon).glyph, p.x, p.y, baseR*0.7, color);
-      if(d.label){
-        ctx.fillStyle='#f1e9d0'; ctx.font='11px monospace';
-        ctx.fillText(d.label, p.x+baseR+4, p.y+4);
-      }
+      if(d.label) haloLabel(d.label, p.x+baseR+4, p.y+4, '#f1e9d0', 'bold 11px monospace');
     } else if(el.element_type==='line'){
       const p1 = worldToScreen(d.x1,d.y1), p2 = worldToScreen(d.x2,d.y2);
-      ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.stroke();
-      if(d.label){ ctx.fillStyle=color; ctx.font='10.5px monospace'; ctx.fillText(d.label, (p1.x+p2.x)/2+4, (p1.y+p2.y)/2-4); }
+      haloLine(p1.x,p1.y,p2.x,p2.y, color, lineW);
+      if(d.label) haloLabel(d.label, (p1.x+p2.x)/2+4, (p1.y+p2.y)/2-4, color, 'bold 10.5px monospace');
     } else if(el.element_type==='arrow'){
       const p1 = worldToScreen(d.x1,d.y1), p2 = worldToScreen(d.x2,d.y2);
-      ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.stroke();
+      haloLine(p1.x,p1.y,p2.x,p2.y, color, lineW);
       drawArrowHead(p1, p2, color);
-      if(d.label){ ctx.fillStyle=color; ctx.font='10.5px monospace'; ctx.fillText(d.label, (p1.x+p2.x)/2+4, (p1.y+p2.y)/2-4); }
+      if(d.label) haloLabel(d.label, (p1.x+p2.x)/2+4, (p1.y+p2.y)/2-4, color, 'bold 10.5px monospace');
     } else if(el.element_type==='zone'){
       const p1 = worldToScreen(d.x1,d.y1), p2 = worldToScreen(d.x2,d.y2);
       ctx.globalAlpha = 0.22;
+      ctx.fillStyle = color;
       ctx.fillRect(p1.x, p1.y, p2.x-p1.x, p2.y-p1.y);
       ctx.globalAlpha = 1;
-      ctx.strokeRect(p1.x, p1.y, p2.x-p1.x, p2.y-p1.y);
-      if(d.label){ ctx.fillStyle=color; ctx.font='10.5px monospace'; ctx.fillText(d.label, Math.min(p1.x,p2.x)+4, Math.min(p1.y,p2.y)+13); }
+      haloRect(p1.x, p1.y, p2.x-p1.x, p2.y-p1.y, color, lineW);
+      if(d.label) haloLabel(d.label, Math.min(p1.x,p2.x)+4, Math.min(p1.y,p2.y)+13, color, 'bold 10.5px monospace');
     } else if(el.element_type==='text'){
       const p = worldToScreen(d.x, d.y);
-      ctx.font='13px Georgia, serif';
-      const w = ctx.measureText(d.text||'').width;
-      ctx.fillStyle='rgba(20,20,10,0.55)'; ctx.fillRect(p.x-3, p.y-13, w+6, 17);
-      ctx.fillStyle = color;
-      ctx.fillText(d.text||'', p.x, p.y);
+      haloLabel(d.text||'', p.x, p.y, color, 'bold 13px Georgia, serif');
     }
   });
 
   if(lineDraft){
     const p1 = worldToScreen(lineDraft.x1, lineDraft.y1);
-    ctx.strokeStyle='#e0bd63'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(lineDraft.curX, lineDraft.curY); ctx.stroke();
+    haloLine(p1.x, p1.y, lineDraft.curX, lineDraft.curY, '#e0bd63', 2);
     if(activeTool==='arrow') drawArrowHead(p1, {x:lineDraft.curX,y:lineDraft.curY}, '#e0bd63');
   }
   if(zoneDraft){
     const p1 = worldToScreen(zoneDraft.x1, zoneDraft.y1);
-    ctx.strokeStyle='#e0bd63'; ctx.lineWidth=2; ctx.strokeRect(p1.x, p1.y, zoneDraft.curX-p1.x, zoneDraft.curY-p1.y);
+    haloRect(p1.x, p1.y, zoneDraft.curX-p1.x, zoneDraft.curY-p1.y, '#e0bd63', 2);
   }
 }
 
