@@ -218,6 +218,14 @@
   .modal.wide{max-width:480px;}
   .modal h3{margin:0 0 6px;font-family:Georgia,serif;font-size:17px;}
   .modal-actions{display:flex;gap:8px;margin-top:18px;justify-content:flex-end;}
+  .cleanup-intro{font-size:11px;color:var(--ink-soft);margin:0 0 10px;line-height:1.5;}
+  .cleanup-list{max-height:340px;overflow-y:auto;border:1px solid #b8ac83;background:var(--parchment-card);}
+  .cleanup-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid #e3d9b6;font-size:11px;cursor:pointer;}
+  .cleanup-row:last-child{border-bottom:none;}
+  .cleanup-row:hover{background:#e6dab0;}
+  .cleanup-name{font-weight:700;color:var(--ink);white-space:nowrap;}
+  .cleanup-sub{color:var(--ink-soft);font-size:9.5px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .cleanup-stock-warn{background:var(--red-stamp);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;letter-spacing:.03em;white-space:nowrap;}
 
   .invite-row{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid #b8ac83;background:var(--parchment);padding:8px 10px;margin-bottom:6px;font-size:11px;}
   .invite-code{font-family:Georgia,serif;font-weight:700;letter-spacing:.05em;}
@@ -472,6 +480,7 @@
         <div class="doc-actions">
           <button class="btn" id="addItemBtn">＋ ADD LINE</button>
           <button class="btn ghost" id="syncCatalogBtn" title="Add any catalog items this ledger is missing">🔄 SYNC CATALOG</button>
+          <button class="btn ghost" id="cleanupCatalogBtn" title="Find and remove lines that don't match the official catalog">🧹 CLEAN UP</button>
           <button class="btn ghost" id="exportLedgerBtn">⇩ FILE COPY</button>
           <button class="btn ghost" id="importLedgerBtn">⇧ RESTORE</button>
           <input type="file" id="importLedgerFile" accept="application/json">
@@ -620,6 +629,18 @@
     <label>Category</label><select id="newItemCat"></select>
     <label>Subtitle (optional)</label><input type="text" id="newItemSub">
     <div class="modal-actions"><button class="btn ghost modal-cancel">CANCEL</button><button class="btn" id="confirmAddItemBtn">ADD</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="cleanupModal">
+  <div class="modal wide">
+    <h3>Clean Up Non-Catalog Items</h3>
+    <p class="cleanup-intro"><span id="cleanupCount">0</span> line(s) don't match the official catalog by name. Anything checked below will be removed — items with tracked stock will lose that stock too, so review before confirming.</p>
+    <div id="cleanupList" class="cleanup-list"></div>
+    <div class="modal-actions">
+      <button class="btn ghost modal-cancel">CANCEL</button>
+      <button class="btn danger" id="confirmCleanupBtn">REMOVE SELECTED</button>
+    </div>
   </div>
 </div>
 
@@ -1629,10 +1650,30 @@ async function loadLedger(){
   renderLedgerView();
 }
 
+// Same reasoning as the map's realtime handler: apply each payload directly instead of
+// re-fetching everything, so a stale in-flight fetch can never race with (and undo) an
+// optimistic local update.
+function applyRealtimePatch(list, payload){
+  if(payload.eventType==='INSERT'){
+    if(!list.some(x=>x.id===payload.new.id)) list.push(payload.new);
+  } else if(payload.eventType==='UPDATE'){
+    const idx = list.findIndex(x=>x.id===payload.new.id);
+    if(idx>=0) list[idx] = payload.new; else list.push(payload.new);
+  } else if(payload.eventType==='DELETE'){
+    return list.filter(x=>x.id!==payload.old.id);
+  }
+  return list;
+}
 function setupLedgerRealtime(){
   const ch = sb.channel('ledger-'+currentLedgerId)
-    .on('postgres_changes', { event:'*', schema:'public', table:'ledger_items', filter:`ledger_id=eq.${currentLedgerId}` }, loadLedger)
-    .on('postgres_changes', { event:'*', schema:'public', table:'ledger_warehouses', filter:`ledger_id=eq.${currentLedgerId}` }, loadLedger)
+    .on('postgres_changes', { event:'*', schema:'public', table:'ledger_items', filter:`ledger_id=eq.${currentLedgerId}` }, payload=>{
+      ledgerItems = applyRealtimePatch(ledgerItems, payload);
+      renderLedgerView();
+    })
+    .on('postgres_changes', { event:'*', schema:'public', table:'ledger_warehouses', filter:`ledger_id=eq.${currentLedgerId}` }, payload=>{
+      ledgerWarehouses = applyRealtimePatch(ledgerWarehouses, payload);
+      renderLedgerView();
+    })
     .subscribe();
   realtimeChannels.push(ch);
 }
@@ -1644,6 +1685,7 @@ function renderLedgerView(){
   const canManage = activeContext.permissions.has('manage_ledger');
   document.getElementById('addItemBtn').classList.toggle('hidden', !canManage);
   document.getElementById('syncCatalogBtn').classList.toggle('hidden', !canManage);
+  document.getElementById('cleanupCatalogBtn').classList.toggle('hidden', !canManage);
   document.getElementById('importLedgerBtn').classList.toggle('hidden', !canManage);
   document.getElementById('resetLedgerBtn').classList.toggle('hidden', !canManage);
 
@@ -1791,10 +1833,25 @@ async function changeLedgerQty(id, delta){
   await changeWhStoredQty(trackerWarehouseId, id, delta);
   showToast(delta>0 ? `Logged +${delta} ${it.name} → ${wh.name}` : `Adjusted ${it.name} in ${wh.name}`);
 }
+// Deleting a ledger item without also clearing its entry from every warehouse's stock map would
+// leave "phantom" quantity behind — invisible in the UI (which filters by matching item id) but
+// still counted in whTotal()/whLineCount(), silently inflating a warehouse's displayed totals.
+async function purgeItemFromWarehouses(itemId){
+  for(const wh of ledgerWarehouses){
+    if(wh.items && Object.prototype.hasOwnProperty.call(wh.items, itemId)){
+      const items = { ...wh.items };
+      delete items[itemId];
+      const { error } = await sb.from('ledger_warehouses').update({ items }).eq('id', wh.id);
+      if(!error) wh.items = items;
+    }
+  }
+}
+
 async function removeLedgerItem(id){
   const { error } = await sb.from('ledger_items').delete().eq('id', id);
   if(error){ showToast(error.message, true); return; }
   ledgerItems = ledgerItems.filter(x=>x.id!==id);
+  await purgeItemFromWarehouses(id);
   renderLedgerView();
   showToast('Line removed from ledger');
 }
@@ -1824,6 +1881,12 @@ document.getElementById('confirmAddItemBtn').addEventListener('click', async ()=
   showToast('Line added');
 });
 
+function catalogKeySet(){
+  const keys = new Set();
+  Object.keys(DEFAULT_ITEMS).forEach(cat=> DEFAULT_ITEMS[cat].forEach(([name])=> keys.add(cat+'::'+name.toLowerCase())));
+  return keys;
+}
+
 document.getElementById('syncCatalogBtn').addEventListener('click', async ()=>{
   if(!confirm('Add any catalog items this ledger is missing (matched by name)? Existing lines and their quantities are left untouched.')) return;
   const existingKeys = new Set(ledgerItems.map(it=> it.category+'::'+it.name.toLowerCase()));
@@ -1840,6 +1903,43 @@ document.getElementById('syncCatalogBtn').addEventListener('click', async ()=>{
   ledgerItems.push(...(data||[]));
   renderLedgerView();
   showToast(`Added ${rows.length} new catalog item${rows.length===1?'':'s'}`);
+});
+
+document.getElementById('cleanupCatalogBtn').addEventListener('click', ()=>{
+  const keys = catalogKeySet();
+  const nonCatalog = ledgerItems.filter(it=> !keys.has(it.category+'::'+it.name.toLowerCase()));
+  if(nonCatalog.length===0){ showToast('No non-catalog items found — your ledger already matches the official list.'); return; }
+  document.getElementById('cleanupCount').textContent = nonCatalog.length;
+  const list = document.getElementById('cleanupList');
+  list.innerHTML = nonCatalog.map(it=>{
+    const stock = warehouseTotalForItem(it.id);
+    const cat = CATEGORIES.find(c=>c.id===it.category);
+    return `
+      <label class="cleanup-row">
+        <input type="checkbox" checked data-cleanup-id="${it.id}">
+        <span class="cleanup-name">${escapeHtml(it.name)}</span>
+        <span class="cleanup-sub">${escapeHtml(cat?cat.label:it.category)}${it.sub?' · '+escapeHtml(it.sub):''}</span>
+        ${stock>0 ? `<span class="cleanup-stock-warn">${fmt(stock)} in stock</span>` : ''}
+      </label>
+    `;
+  }).join('');
+  document.getElementById('cleanupModal').classList.add('show');
+});
+document.getElementById('confirmCleanupBtn').addEventListener('click', async ()=>{
+  const ids = $all('#cleanupList input:checked').map(i=>i.dataset.cleanupId);
+  if(ids.length===0){ showToast('Nothing selected', true); return; }
+  if(!confirm(`Remove ${ids.length} item${ids.length===1?'':'s'} from the ledger? Any warehouse stock tracked for them will be cleared too. This cannot be undone.`)) return;
+  let removed = 0;
+  for(const id of ids){
+    const { error } = await sb.from('ledger_items').delete().eq('id', id);
+    if(error){ showToast(error.message, true); continue; }
+    ledgerItems = ledgerItems.filter(x=>x.id!==id);
+    await purgeItemFromWarehouses(id);
+    removed++;
+  }
+  document.getElementById('cleanupModal').classList.remove('show');
+  renderLedgerView();
+  showToast(`Removed ${removed} item${removed===1?'':'s'}`);
 });
 
 /* ---------- Stats ---------- */
@@ -2602,10 +2702,19 @@ async function loadOp(op){
 
 function setupMapRealtime(opId){
   teardownMapRealtime();
+  // Apply each change directly from its payload rather than re-fetching the whole table on every
+  // event — a fetch-and-replace here would race with our own optimistic local updates (e.g. a
+  // slower stale fetch finishing after a newer one and wiping out something just added).
   const ch = sb.channel('op-'+opId)
-    .on('postgres_changes', { event:'*', schema:'public', table:'op_elements', filter:`op_id=eq.${opId}` }, async ()=>{
-      const { data } = await sb.from('op_elements').select('*').eq('op_id', opId);
-      opElements = data || [];
+    .on('postgres_changes', { event:'*', schema:'public', table:'op_elements', filter:`op_id=eq.${opId}` }, payload=>{
+      if(payload.eventType==='INSERT'){
+        if(!opElements.some(e=>e.id===payload.new.id)) opElements.push(payload.new);
+      } else if(payload.eventType==='UPDATE'){
+        const idx = opElements.findIndex(e=>e.id===payload.new.id);
+        if(idx>=0) opElements[idx] = payload.new; else opElements.push(payload.new);
+      } else if(payload.eventType==='DELETE'){
+        opElements = opElements.filter(e=>e.id!==payload.old.id);
+      }
       drawMap();
       renderLegend();
     })
