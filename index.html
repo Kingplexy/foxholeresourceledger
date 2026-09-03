@@ -264,6 +264,7 @@
   .bulk-row input{width:38px;text-align:center;border:1px solid #b8ac83;background:var(--parchment);font-family:inherit;font-size:11px;padding:3px 2px;color:var(--ink);}
   .receive-link{margin-left:auto;font-size:9.5px;font-weight:700;letter-spacing:.04em;color:var(--red-stamp);text-decoration:underline;cursor:pointer;background:none;border:none;font-family:inherit;padding:0;}
   .receive-link:hover{opacity:.7;}
+  .qty-hint{font-size:9.5px;color:var(--ink-soft);text-align:center;font-style:italic;margin-top:2px;}
   .remove-x{background:none;border:none;color:#a99a6e;font-size:12px;cursor:pointer;padding:0 0 0 6px;line-height:1;}
   .remove-x:hover{color:var(--red-stamp);}
 
@@ -1352,12 +1353,17 @@ function renderLedgerView(){
   renderLedgerStats();
 }
 
+// Total production is derived from warehouses, not a separately-editable counter — every unit
+// has to live in some warehouse for it to count toward the regiment's total.
+function warehouseTotalForItem(itemId){
+  return ledgerWarehouses.reduce((sum, wh) => sum + ((wh.items && wh.items[itemId]) || 0), 0);
+}
 function effectiveQty(it){
   if(trackerWarehouseId){
     const wh = ledgerWarehouses.find(w=>w.id===trackerWarehouseId);
-    if(wh) return (wh.items && wh.items[it.id]) || 0;
+    return wh ? ((wh.items && wh.items[it.id]) || 0) : 0;
   }
-  return it.qty;
+  return warehouseTotalForItem(it.id);
 }
 
 function populateTrackerWhSelect(){
@@ -1405,8 +1411,9 @@ function renderLedgerCategory(cat, canEdit, canManage){
 function buildLedgerCard(it, showCatBadge, canEdit, canManage){
   const cat = CATEGORIES.find(c=>c.id===it.category);
   const qty = effectiveQty(it);
+  const canEditQty = canEdit && !!trackerWarehouseId;
   let subText = showCatBadge ? ((cat?cat.label+' · ':'')+(it.sub||'')) : (it.sub||'');
-  if(trackerWarehouseId) subText += ` · total made: ${fmt(it.qty)}`;
+  if(trackerWarehouseId) subText += ` · total made: ${fmt(warehouseTotalForItem(it.id))}`;
   const card = document.createElement('div');
   card.className = 'card';
   card.innerHTML = `
@@ -1419,16 +1426,16 @@ function buildLedgerCard(it, showCatBadge, canEdit, canManage){
       ${canManage ? `<button class="remove-x" title="Remove line" data-remove="${it.id}">✕</button>` : ''}
     </div>
     <div class="qty-row">
-      <button class="qty-btn" data-act="dec" data-id="${it.id}" ${canEdit?'':'disabled'}>−</button>
+      <button class="qty-btn" data-act="dec" data-id="${it.id}" ${canEditQty?'':'disabled'}>−</button>
       <div class="qty-val">${fmt(qty)}</div>
-      <button class="qty-btn" data-act="inc" data-id="${it.id}" ${canEdit?'':'disabled'}>+</button>
+      <button class="qty-btn" data-act="inc" data-id="${it.id}" ${canEditQty?'':'disabled'}>+</button>
     </div>
-    ${canEdit ? `
+    ${canEditQty ? `
     <div class="bulk-row">
       <span class="dots">···</span>
       <input type="number" min="1" value="1" data-bulk="${it.id}">
       <button class="receive-link" data-receive="${it.id}">RECEIVE +<span data-receive-n="${it.id}">1</span></button>
-    </div>` : ''}
+    </div>` : (canEdit ? `<div class="qty-hint">Pick a warehouse under "LOGGING TO" above to log production</div>` : '')}
   `;
   return card;
 }
@@ -1457,30 +1464,11 @@ document.getElementById('ledgerGrid').addEventListener('input', e=>{
 async function changeLedgerQty(id, delta){
   const it = ledgerItems.find(x=>x.id===id);
   if(!it) return;
-
-  if(trackerWarehouseId){
-    const wh = ledgerWarehouses.find(w=>w.id===trackerWarehouseId);
-    if(!wh){ trackerWarehouseId = null; renderLedgerView(); return; }
-    const items = { ...(wh.items||{}) };
-    items[id] = Math.max(0, (items[id]||0) + delta);
-    const { error } = await sb.from('ledger_warehouses').update({ items }).eq('id', wh.id);
-    if(error){ showToast(error.message, true); return; }
-    wh.items = items;
-    renderLedgerView();
-    showToast(delta>0 ? `Logged +${delta} ${it.name} → ${wh.name}` : `Adjusted ${it.name} in ${wh.name}`);
-    return;
-  }
-
-  const newQty = Math.max(0, it.qty + delta);
-  const { error } = await sb.from('ledger_items').update({ qty:newQty }).eq('id', id);
-  if(error){ showToast(error.message, true); return; }
-  if(delta>0){
-    const { data: logRow } = await sb.from('ledger_log').insert({ ledger_id: currentLedgerId, item_name: it.name, qty_delta: delta, actor_id: currentUser.id }).select().single();
-    if(logRow) ledgerLatestLog = logRow;
-  }
-  it.qty = newQty;
-  renderLedgerView();
-  showToast(delta>0 ? `Logged +${delta} ${it.name}` : `Adjusted ${it.name}`);
+  if(!trackerWarehouseId){ showToast('Pick a warehouse under "LOGGING TO" to log production', true); return; }
+  const wh = ledgerWarehouses.find(w=>w.id===trackerWarehouseId);
+  if(!wh){ trackerWarehouseId = null; renderLedgerView(); return; }
+  await changeWhStoredQty(trackerWarehouseId, id, delta);
+  showToast(delta>0 ? `Logged +${delta} ${it.name} → ${wh.name}` : `Adjusted ${it.name} in ${wh.name}`);
 }
 async function removeLedgerItem(id){
   const { error } = await sb.from('ledger_items').delete().eq('id', id);
@@ -1518,7 +1506,10 @@ document.getElementById('confirmAddItemBtn').addEventListener('click', async ()=
 /* ---------- Stats ---------- */
 function renderLedgerStats(){
   let total=0, activeLines=0;
-  ledgerItems.forEach(it=>{ total += (it.qty||0); if(it.qty>0) activeLines++; });
+  ledgerItems.forEach(it=>{
+    const q = warehouseTotalForItem(it.id);
+    total += q; if(q>0) activeLines++;
+  });
   document.getElementById('statTotal').innerHTML = fmt(total) + ' <small>articles amassed</small>';
   document.getElementById('statActive').innerHTML = fmt(activeLines) + ' <small>producing lines</small>';
   document.getElementById('statCatalog').innerHTML = fmt(ledgerItems.length) + ' <small>authorized items</small>';
@@ -1653,6 +1644,12 @@ function renderWhStored(wh, canEdit){
     });
 }
 
+async function logProductionEntry(itemName, delta){
+  if(delta<=0) return;
+  const { data: logRow } = await sb.from('ledger_log').insert({ ledger_id: currentLedgerId, item_name: itemName, qty_delta: delta, actor_id: currentUser.id }).select().single();
+  if(logRow) ledgerLatestLog = logRow;
+}
+
 async function changeWhStoredQty(whId, itemId, delta){
   const wh = ledgerWarehouses.find(w=>w.id===whId);
   if(!wh) return;
@@ -1661,6 +1658,8 @@ async function changeWhStoredQty(whId, itemId, delta){
   const { error } = await sb.from('ledger_warehouses').update({ items }).eq('id', whId);
   if(error){ showToast(error.message, true); return; }
   wh.items = items;
+  const it = ledgerItems.find(x=>x.id===itemId);
+  if(it) await logProductionEntry(it.name, delta);
   renderLedgerView();
 }
 
@@ -1756,7 +1755,9 @@ document.getElementById('whConfirmBtn').addEventListener('click', async ()=>{
 
 /* ---------- Export / Import / Reset ---------- */
 document.getElementById('exportLedgerBtn').addEventListener('click', ()=>{
-  const payload = { context: activeContext.name, exportedAt: new Date().toISOString(), items: ledgerItems, warehouses: ledgerWarehouses };
+  // qty here is a computed snapshot (sum across warehouses) for readability — warehouses[].items is what actually gets restored on import.
+  const itemsSnapshot = ledgerItems.map(it=> ({ ...it, qty: warehouseTotalForItem(it.id) }));
+  const payload = { context: activeContext.name, exportedAt: new Date().toISOString(), items: itemsSnapshot, warehouses: ledgerWarehouses };
   const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1772,7 +1773,7 @@ document.getElementById('importLedgerFile').addEventListener('change', e=>{
   const file = e.target.files[0];
   e.target.value = '';
   if(!file) return;
-  if(!confirm('Restore from this file? Quantities for matching item names will be added to current counts, and unmatched items will be added as new lines. This affects the whole regiment\'s shared ledger.')) return;
+  if(!confirm("Restore from this file? Warehouse stock for matching warehouse+item names will be added to current stock, unmatched items/warehouses will be created, and other regiment members will see the change. This affects the whole regiment's shared ledger.")) return;
   const reader = new FileReader();
   reader.onload = async evt=>{
     try{
@@ -1787,29 +1788,58 @@ document.getElementById('importLedgerFile').addEventListener('change', e=>{
   reader.readAsText(file);
 });
 async function importLedgerData(data){
+  // Pass 1: match/create catalog items, and map the file's old item ids to current item ids
+  // so warehouse stock (keyed by item id) can be remapped correctly.
+  const idMap = {};
   for(const fileItem of data.items){
-    const match = ledgerItems.find(it=> it.category===fileItem.category && it.name.toLowerCase()===String(fileItem.name||'').toLowerCase());
-    if(match){
-      const newQty = (match.qty||0) + (fileItem.qty||0);
-      const { error } = await sb.from('ledger_items').update({ qty:newQty }).eq('id', match.id);
-      if(!error) match.qty = newQty;
-    } else if(fileItem.name && fileItem.category){
-      const { data: created, error } = await sb.from('ledger_items').insert({ ledger_id: currentLedgerId, category: fileItem.category, name: fileItem.name, sub: fileItem.sub||'', qty: fileItem.qty||0 }).select().single();
-      if(!error && created) ledgerItems.push(created);
+    if(!fileItem.name || !fileItem.category) continue;
+    let match = ledgerItems.find(it=> it.category===fileItem.category && it.name.toLowerCase()===String(fileItem.name).toLowerCase());
+    if(!match){
+      const { data: created, error } = await sb.from('ledger_items').insert({ ledger_id: currentLedgerId, category: fileItem.category, name: fileItem.name, sub: fileItem.sub||'', qty:0 }).select().single();
+      if(error || !created) continue;
+      ledgerItems.push(created);
+      match = created;
     }
+    if(fileItem.id) idMap[fileItem.id] = match.id;
   }
+
+  // Pass 2: match/create warehouses by name, then merge their stock using the id map above.
+  for(const fileWh of (data.warehouses||[])){
+    if(!fileWh.name) continue;
+    let wh = ledgerWarehouses.find(w=> w.name.toLowerCase()===String(fileWh.name).toLowerCase());
+    if(!wh){
+      const { data: created, error } = await sb.from('ledger_warehouses').insert({ ledger_id: currentLedgerId, name: fileWh.name, type: fileWh.type||WAREHOUSE_TYPES[0].id, items:{}, created_by: currentUser.id }).select().single();
+      if(error || !created) continue;
+      ledgerWarehouses.push(created);
+      wh = created;
+    }
+    const mergedItems = { ...(wh.items||{}) };
+    Object.entries(fileWh.items||{}).forEach(([oldItemId, qty])=>{
+      const newItemId = idMap[oldItemId];
+      if(!newItemId || !(qty>0)) return;
+      mergedItems[newItemId] = (mergedItems[newItemId]||0) + qty;
+    });
+    const { error } = await sb.from('ledger_warehouses').update({ items: mergedItems }).eq('id', wh.id);
+    if(!error) wh.items = mergedItems;
+  }
+
   renderLedgerView();
 }
 
 document.getElementById('resetLedgerBtn').addEventListener('click', async ()=>{
-  if(!confirm('Reset all quantities to zero for the ENTIRE regiment\'s ledger? Custom lines are kept, but every count and the activity log are cleared for everyone. This cannot be undone.')) return;
-  const { error } = await sb.from('ledger_items').update({ qty:0 }).eq('ledger_id', currentLedgerId);
-  if(error) return showToast(error.message, true);
-  await sb.from('ledger_log').delete().eq('ledger_id', currentLedgerId);
-  ledgerItems.forEach(it=> it.qty = 0);
+  if(!confirm("Reset ALL production to zero for the ENTIRE regiment? Every warehouse's stock and the activity log will be cleared for everyone. Custom lines and the warehouses themselves are kept — just emptied. This cannot be undone.")) return;
+  try{
+    for(const wh of ledgerWarehouses){
+      const { error } = await sb.from('ledger_warehouses').update({ items:{} }).eq('id', wh.id);
+      if(error) throw error;
+      wh.items = {};
+    }
+    const { error: logErr } = await sb.from('ledger_log').delete().eq('ledger_id', currentLedgerId);
+    if(logErr) throw logErr;
+  }catch(e){ showToast(e.message, true); return; }
   ledgerLatestLog = null;
   renderLedgerView();
-  showToast('All counts reset to zero');
+  showToast('All production reset to zero');
 });
 
 /* ==========================================================================
