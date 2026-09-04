@@ -1747,10 +1747,11 @@ async function initSiteAdmin(){
   isRootAdmin = (currentUser.email||'').toLowerCase() === ROOT_ADMIN_EMAIL;
   try{
     if(isRootAdmin){
-      const { data: existing } = await sb.from('site_admins').select('user_id').eq('user_id', currentUser.id).maybeSingle();
-      if(!existing){
-        await sb.from('site_admins').insert({ user_id: currentUser.id, permissions: SITE_ADMIN_PERMISSIONS.map(p=>p.key), added_by: currentUser.id });
-      }
+      // Upsert (not insert-if-missing) so the root admin's DB row always has every
+      // permission key this build knows about — an existing row from before new
+      // permissions were added would otherwise silently keep the old, shorter list,
+      // which the SECURITY DEFINER RPCs check against (not the client's assumed set).
+      await sb.from('site_admins').upsert({ user_id: currentUser.id, permissions: SITE_ADMIN_PERMISSIONS.map(p=>p.key), added_by: currentUser.id });
       siteAdminPermissions = new Set(SITE_ADMIN_PERMISSIONS.map(p=>p.key));
     } else {
       const { data } = await sb.from('site_admins').select('permissions').eq('user_id', currentUser.id).maybeSingle();
